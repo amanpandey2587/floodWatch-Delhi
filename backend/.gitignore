@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+flood_model.pkl
+env/
+venv/
+ENV/
+.venv
+.vevn
+
