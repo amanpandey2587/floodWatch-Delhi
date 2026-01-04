@@ -92,23 +92,4 @@ See [QUICKSTART.md](QUICKSTART.md) for detailed step-by-step instructions.
 - **Hotspot Details:** Click on markers to see detailed flood probability information
 - **Active Alerts:** Dashboard showing count of critical flood alerts
 
-## API Endpoints
-
-- `POST /predict` - Predict flood risk for all hotspots
-  - Request: `{ "rainfall_intensity": float }`
-  - Response: List of hotspots with risk levels and probabilities
-
-- `GET /hotspots` - Get list of all monitored hotspots
-
-- `GET /docs` - Interactive API documentation (Swagger UI)
-
-## Notes
-
-- The model uses a simple Random Forest classifier trained on synthetic data
-- If the model file is not found, the backend falls back to rule-based prediction logic
-- The application monitors 12 major flood-prone areas in Delhi
-- No API keys required - uses free OpenStreetMap tiles
-
-## Troubleshooting
-
-See [QUICKSTART.md](QUICKSTART.md) for detailed troubleshooting guide.
+\
