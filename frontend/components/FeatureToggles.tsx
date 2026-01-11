@@ -1,6 +1,6 @@
 'use client'
 
-import { TrafficLight, Map, MessageSquare } from 'lucide-react'
+import { TrafficCone, Map, MessageSquare } from 'lucide-react'
 
 interface FeatureTogglesProps {
   showTraffic: boolean
@@ -31,7 +31,7 @@ export default function FeatureToggles({
               : 'bg-gray-50 text-gray-700 border border-gray-200 hover:bg-gray-100'
           }`}
         >
-          <TrafficLight className="w-5 h-5" />
+          <TrafficCone className="w-5 h-5" />
           <span className="font-medium">Traffic Overlay</span>
           {showTraffic && <span className="ml-auto text-xs">ON</span>}
         </button>
