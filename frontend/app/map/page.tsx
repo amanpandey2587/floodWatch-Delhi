@@ -7,19 +7,28 @@ import StatsPanel from '@/components/StatsPanel';
 import WardRiskPanel from '@/components/WardRiskPanel';
 import RouteCalculator from '@/components/RouteCalculator';
 import FeatureToggles from '@/components/FeatureToggles';
-import SOSBroadcast from '@/components/SOSBroadcast';
+import MapModeToggle from '@/components/MapModeToggle';
 
 const EnhancedMap = dynamic(() => import('@/components/EnhancedMap'), {
   ssr: false,
-  loading: () => (
+  loading: () => <MapLoadingSpinner />,
+});
+
+const GoogleMapEnhanced = dynamic(() => import('@/components/GoogleMapEnhanced'), {
+  ssr: false,
+  loading: () => <MapLoadingSpinner />,
+});
+
+function MapLoadingSpinner() {
+  return (
     <div className="w-full h-full flex items-center justify-center bg-gray-100">
       <div className="text-center">
         <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
         <p className="text-gray-600">Loading map...</p>
       </div>
     </div>
-  ),
-});
+  );
+}
 
 interface HotspotPrediction {
   id: number;
@@ -57,6 +66,9 @@ interface CrowdsourceReport {
   severity: number;
 }
 
+type MapMode = 'leaflet' | 'google-standard' | 'google-3d' | 'google-streetview';
+type GoogleMapMode = 'standard' | '3d' | 'streetview';
+
 export default function MapPage() {
   const [rainfallIntensity, setRainfallIntensity] = useState(50);
   const [hotspots, setHotspots] = useState<HotspotPrediction[]>([]);
@@ -67,6 +79,7 @@ export default function MapPage() {
   const [showTraffic, setShowTraffic] = useState(false);
   const [showWards, setShowWards] = useState(false);
   const [showCrowdsource, setShowCrowdsource] = useState(false);
+  const [mapMode, setMapMode] = useState<MapMode>('leaflet');
 
   const fetchPredictions = useCallback(async (rainfall: number) => {
     setLoading(true);
@@ -142,72 +155,103 @@ export default function MapPage() {
     setRainfallIntensity(value);
   };
 
+  const handleMapModeChange = (mode: MapMode) => {
+    setMapMode(mode);
+  };
+
   const activeAlerts = hotspots.filter((h) => h.risk_level === 2).length;
+
+  const getGoogleMapMode = (): GoogleMapMode => {
+    if (mapMode === 'google-3d') return '3d';
+    if (mapMode === 'google-streetview') return 'streetview';
+    return 'standard';
+  };
 
   return (
     <main className="relative w-screen h-screen overflow-hidden">
-      <div className="absolute top-4 left-4 z-10">
+      {/* Map Container - z-0 (bottom layer) */}
+      <div className="absolute inset-0 z-0">
+        {mapMode === 'leaflet' ? (
+          <EnhancedMap
+            hotspots={hotspots}
+            route={route}
+            showTraffic={showTraffic}
+            showWards={showWards}
+            showCrowdsource={showCrowdsource}
+            rainfallIntensity={rainfallIntensity}
+            wards={wards}
+            crowdsourceReports={crowdsourceReports}
+          />
+        ) : (
+          <GoogleMapEnhanced
+            hotspots={hotspots}
+            route={route}
+            showTraffic={showTraffic}
+            showWards={showWards}
+            showCrowdsource={showCrowdsource}
+            rainfallIntensity={rainfallIntensity}
+            wards={wards}
+            crowdsourceReports={crowdsourceReports}
+            mapMode={getGoogleMapMode()}
+          />
+        )}
+      </div>
+
+      {/* Header - z-20 */}
+      <div className="absolute top-4 left-4 z-20 pointer-events-none">
         <h1 className="text-3xl font-bold text-white drop-shadow-lg">FloodWatch Delhi</h1>
         <p className="text-sm text-white/80 drop-shadow-md">Real-time Flood Risk Prediction & Management</p>
       </div>
 
-      <div className="absolute left-4 top-24 z-10 flex flex-col gap-4 max-h-[calc(100vh-120px)] overflow-y-auto">
-        <Sidebar
-          rainfallIntensity={rainfallIntensity}
-          onRainfallChange={handleRainfallChange}
-          loading={loading}
-        />
+      {/* Left Sidebar Panel - z-30 */}
+      <div className="absolute left-4 top-24 bottom-4 z-30 flex flex-col gap-4 w-[280px] pointer-events-none">
+        <div className="flex flex-col gap-4 overflow-y-auto pointer-events-auto max-h-full">
+          <MapModeToggle currentMode={mapMode} onModeChange={handleMapModeChange} />
 
-        <RouteCalculator onRouteCalculate={calculateRoute} />
+          <Sidebar
+            rainfallIntensity={rainfallIntensity}
+            onRainfallChange={handleRainfallChange}
+            loading={loading}
+          />
 
-        <FeatureToggles
-          showTraffic={showTraffic}
-          showWards={showWards}
-          showCrowdsource={showCrowdsource}
-          onToggleTraffic={() => setShowTraffic(!showTraffic)}
-          onToggleWards={() => setShowWards(!showWards)}
-          onToggleCrowdsource={() => setShowCrowdsource(!showCrowdsource)}
-        />
+          <RouteCalculator onRouteCalculate={calculateRoute} />
 
-        {route && route.warnings.length > 0 && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-            <h4 className="font-semibold text-red-800 mb-2">Route Warnings</h4>
-            <ul className="text-sm text-red-700 space-y-1">
-              {route.warnings.map((warning, idx) => (
-                <li key={idx}>{warning}</li>
-              ))}
-            </ul>
-            {route.distance_km && (
-              <div className="mt-2 text-xs text-red-600">
-                Distance: {route.distance_km} km • Duration: {route.duration_min} min
-              </div>
-            )}
-          </div>
-        )}
+          <FeatureToggles
+            showTraffic={showTraffic}
+            showWards={showWards}
+            showCrowdsource={showCrowdsource}
+            onToggleTraffic={() => setShowTraffic(!showTraffic)}
+            onToggleWards={() => setShowWards(!showWards)}
+            onToggleCrowdsource={() => setShowCrowdsource(!showCrowdsource)}
+          />
+
+          {route && route.warnings.length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 shadow-lg">
+              <h4 className="font-semibold text-red-800 mb-2">⚠️ Route Warnings</h4>
+              <ul className="text-sm text-red-700 space-y-1">
+                {route.warnings.map((warning, idx) => (
+                  <li key={idx}>• {warning}</li>
+                ))}
+              </ul>
+              {route.distance_km && (
+                <div className="mt-2 text-xs text-red-600 pt-2 border-t border-red-200">
+                  📍 Distance: {route.distance_km} km • ⏱️ Duration: {route.duration_min} min
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="absolute right-4 top-24 z-10 w-80 max-h-[calc(100vh-120px)] overflow-y-auto">
-        <SOSBroadcast wards={wards.map((w) => ({ id: w.id, name: w.name }))} />
-      </div>
-
-      <div className="absolute top-4 right-4 z-10">
+      {/* Right Top - Stats Panel - z-40 */}
+      <div className="absolute top-4 right-4 z-40 pointer-events-auto">
         <StatsPanel activeAlerts={activeAlerts} totalHotspots={hotspots.length} />
       </div>
 
-      <div className="absolute bottom-4 right-4 z-10">
+      {/* Right Bottom - Ward Risk Panel - z-30 */}
+      <div className="absolute bottom-4 right-4 z-30 pointer-events-auto">
         <WardRiskPanel rainfallIntensity={rainfallIntensity} />
       </div>
-
-      <EnhancedMap
-        hotspots={hotspots}
-        route={route}
-        showTraffic={showTraffic}
-        showWards={showWards}
-        showCrowdsource={showCrowdsource}
-        rainfallIntensity={rainfallIntensity}
-        wards={wards}
-        crowdsourceReports={crowdsourceReports}
-      />
     </main>
   );
 }

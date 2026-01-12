@@ -301,14 +301,18 @@ def broadcast_sos(request: SOSRequest):
 # ============================================================================
 
 @app.post("/api/complaints")
-async def create_complaint(complaint: ComplaintCreate, user_id: str = Header(..., alias="X-User-ID")):
+async def create_complaint(
+    complaint: ComplaintCreate, 
+    user_id: Optional[str] = Header(None, alias="X-User-ID")  # Changed!
+):
     """File a new complaint"""
     try:
-        result = file_complaint(complaint, user_id)
+        effective_user_id = user_id or "anonymous-user"  # Fallback
+        result = file_complaint(complaint, effective_user_id)
         return JSONResponse(status_code=201, content=result)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-
+    
 @app.get("/api/complaints")
 async def list_complaints(
     user_id: Optional[str] = Header(None, alias="X-User-ID"),

@@ -37,7 +37,7 @@ export default function Sidebar({
   }
 
   return (
-    <div className="absolute left-4 top-24 z-10 bg-white/95 backdrop-blur-sm rounded-lg shadow-xl p-6 min-w-[280px]">
+    <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-xl p-6">
       <div className="flex items-center gap-2 mb-4">
         <Droplets className="w-5 h-5 text-blue-600" />
         <h2 className="text-xl font-semibold text-gray-800">Simulation Control</h2>

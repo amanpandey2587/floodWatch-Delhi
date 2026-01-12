@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useComplaintAPI } from '@/lib/api';
-import { useRouter } from 'next/navigation';
-import { Camera, XCircle } from 'lucide-react';
+import { useState } from "react";
+import { useComplaintAPI } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { Camera, XCircle } from "lucide-react";
 
 interface FileComplaintProps {
   onSuccess?: () => void;
@@ -20,11 +20,11 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
 
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    category: '',
+    title: "",
+    description: "",
+    category: "",
     ward_number: 44,
-    priority: 'medium',
+    priority: "medium",
     location: null as { latitude: number; longitude: number } | null,
   });
 
@@ -37,13 +37,13 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
       const newFiles: File[] = [];
       const newPreviews: string[] = [];
 
-      filesArray.forEach(file => {
+      filesArray.forEach((file) => {
         if (selectedFiles.length + newFiles.length >= MAX_FILES) {
           setError(`Maximum ${MAX_FILES} images allowed.`);
           return;
         }
-        if (!file.type.startsWith('image/')) {
-          setError('Only image files are allowed.');
+        if (!file.type.startsWith("image/")) {
+          setError("Only image files are allowed.");
           return;
         }
         if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
@@ -56,8 +56,8 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
         reader.onloadend = () => {
           newPreviews.push(reader.result as string);
           if (newPreviews.length === newFiles.length) {
-            setSelectedFiles(prev => [...prev, ...newFiles]);
-            setImagePreviews(prev => [...prev, ...newPreviews]);
+            setSelectedFiles((prev) => [...prev, ...newFiles]);
+            setImagePreviews((prev) => [...prev, ...newPreviews]);
             setError(null);
           }
         };
@@ -67,8 +67,8 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
   };
 
   const handleRemoveImage = (index: number) => {
-    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
-    setImagePreviews(prev => prev.filter((_, i) => i !== index));
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -83,13 +83,13 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
         const base64 = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result as string);
-          reader.onerror = error => reject(error);
+          reader.onerror = (error) => reject(error);
           reader.readAsDataURL(file);
         });
         attachments.push(base64);
       }
 
-      const result = await complaintAPI.fileComplaint({
+      const payload = {
         title: formData.title,
         description: formData.description,
         category: formData.category,
@@ -97,11 +97,15 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
         priority: formData.priority,
         location: formData.location,
         attachments: attachments,
-      });
+      };
+
+      console.log("Filing complaint with payload:", payload); // DEBUG
+
+      const result = await complaintAPI.fileComplaint(payload);
 
       setComplaintId(result.complaint_id);
       setSuccess(true);
-      
+
       if (onSuccess) {
         onSuccess();
       } else {
@@ -110,7 +114,30 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
         }, 2000);
       }
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to file complaint. Please try again.');
+      console.error("Complaint filing error:", err);
+      console.error("Error response:", err.response?.data);
+      console.error(
+        "Error detail:",
+        JSON.stringify(err.response?.data?.detail, null, 2)
+      ); // ADD THIS LINE
+
+      // Handle validation errors
+      if (err.response?.status === 422) {
+        const validationErrors = err.response?.data?.detail;
+        if (Array.isArray(validationErrors)) {
+          const errorMessages = validationErrors
+            .map((e: any) => `${e.loc.join(".")}: ${e.msg}`)
+            .join(", ");
+          setError(`Validation error: ${errorMessages}`);
+        } else {
+          setError("Invalid data submitted. Please check all fields.");
+        }
+      } else {
+        setError(
+          err.response?.data?.detail ||
+            "Failed to file complaint. Please try again."
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -141,7 +168,9 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
 
   return (
     <div className="max-w-3xl mx-auto p-8 bg-white rounded-lg shadow-lg">
-      <h2 className="text-3xl font-bold text-gray-900 mb-6 text-center">File a New Complaint</h2>
+      <h2 className="text-3xl font-bold text-gray-900 mb-6 text-center">
+        File a New Complaint
+      </h2>
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
           {error}
@@ -149,19 +178,26 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
       )}
       {success && (
         <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded mb-4">
-          Complaint filed successfully! Your ID is: <span className="font-mono font-semibold">{complaintId}</span>. Redirecting...
+          Complaint filed successfully! Your ID is:{" "}
+          <span className="font-mono font-semibold">{complaintId}</span>.
+          Redirecting...
         </div>
       )}
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
+          <label
+            htmlFor="title"
+            className="block text-sm font-medium text-gray-700 mb-2"
+          >
             Title
           </label>
           <input
             type="text"
             id="title"
             value={formData.title}
-            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, title: e.target.value })
+            }
             required
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="e.g., Severe waterlogging near XYZ market"
@@ -169,13 +205,18 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
         </div>
 
         <div>
-          <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+          <label
+            htmlFor="description"
+            className="block text-sm font-medium text-gray-700 mb-2"
+          >
             Description
           </label>
           <textarea
             id="description"
             value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, description: e.target.value })
+            }
             required
             rows={5}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -185,13 +226,18 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">
+            <label
+              htmlFor="category"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
               Category
             </label>
             <select
               id="category"
               value={formData.category}
-              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, category: e.target.value })
+              }
               required
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
@@ -204,14 +250,22 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
             </select>
           </div>
           <div>
-            <label htmlFor="ward_number" className="block text-sm font-medium text-gray-700 mb-2">
+            <label
+              htmlFor="ward_number"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
               Ward Number
             </label>
             <input
               type="number"
               id="ward_number"
               value={formData.ward_number}
-              onChange={(e) => setFormData({ ...formData, ward_number: parseInt(e.target.value) })}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  ward_number: parseInt(e.target.value),
+                })
+              }
               required
               min="1"
               max="272"
@@ -221,13 +275,18 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
         </div>
 
         <div>
-          <label htmlFor="priority" className="block text-sm font-medium text-gray-700 mb-2">
+          <label
+            htmlFor="priority"
+            className="block text-sm font-medium text-gray-700 mb-2"
+          >
             Priority
           </label>
           <select
             id="priority"
             value={formData.priority}
-            onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, priority: e.target.value })
+            }
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="low">Low</option>
@@ -246,18 +305,22 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
             onClick={getCurrentLocation}
             className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
           >
-            {formData.location ? '✓ Location Captured' : 'Use Current Location'}
+            {formData.location ? "✓ Location Captured" : "Use Current Location"}
           </button>
           {formData.location && (
             <p className="mt-2 text-sm text-gray-600">
-              Lat: {formData.location.latitude.toFixed(6)}, Lng: {formData.location.longitude.toFixed(6)}
+              Lat: {formData.location.latitude.toFixed(6)}, Lng:{" "}
+              {formData.location.longitude.toFixed(6)}
             </p>
           )}
         </div>
 
         {/* Photo Upload Section */}
         <div>
-          <label htmlFor="attachments" className="block text-sm font-medium text-gray-700 mb-2">
+          <label
+            htmlFor="attachments"
+            className="block text-sm font-medium text-gray-700 mb-2"
+          >
             Photos (Optional, max {MAX_FILES})
           </label>
           <input
@@ -276,8 +339,15 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
           {imagePreviews.length > 0 && (
             <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
               {imagePreviews.map((preview, index) => (
-                <div key={index} className="relative w-24 h-24 rounded-lg overflow-hidden shadow-md">
-                  <img src={preview} alt={`Preview ${index}`} className="w-full h-full object-cover" />
+                <div
+                  key={index}
+                  className="relative w-24 h-24 rounded-lg overflow-hidden shadow-md"
+                >
+                  <img
+                    src={preview}
+                    alt={`Preview ${index}`}
+                    className="w-full h-full object-cover"
+                  />
                   <button
                     type="button"
                     onClick={() => handleRemoveImage(index)}
@@ -298,7 +368,7 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
             disabled={loading}
             className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Filing Complaint...' : 'File Complaint'}
+            {loading ? "Filing Complaint..." : "File Complaint"}
           </button>
           <button
             type="button"

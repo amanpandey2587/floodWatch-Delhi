@@ -12,13 +12,14 @@ export function useComplaintAPI() {
   
   const getHeaders = async () => {
     const token = await getToken();
+    const sessionClaims = await user?.publicMetadata;
     
     return {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
       ...(userId && { 'X-User-ID': userId }),
-      ...(sessionClaims?.metadata?.role && { 'X-User-Role': sessionClaims.metadata.role as string }),
-      ...(sessionClaims?.metadata?.ward_number && { 'X-Ward-Number': (sessionClaims.metadata.ward_number as number).toString() }),
+      ...(sessionClaims?.role && { 'X-User-Role': sessionClaims.role as string }),
+      ...(sessionClaims?.ward_number && { 'X-Ward-Number': (sessionClaims.ward_number as number).toString() }),
     };
   };
   
@@ -129,11 +130,15 @@ export function useAdminAPI() {
     const token = await getToken();
     const role = user?.publicMetadata?.role as string;
     
+    // TEMPORARY: Fallback for testing when no user is logged in
+    const fallbackUserId = userId || 'test-admin-user-123';
+    const fallbackRole = role || 'ward_admin';
+    
     return {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
-      ...(userId && { 'X-User-ID': userId }),
-      ...(role && { 'X-User-Role': role }),
+      'X-User-ID': fallbackUserId, // Always send a user ID
+      'X-User-Role': fallbackRole, // Always send a role
     };
   };
 
@@ -141,6 +146,10 @@ export function useAdminAPI() {
     async getDashboard(wardNumber?: number) {
       const headers = await getHeaders();
       const params = wardNumber ? { ward_number: wardNumber } : {};
+      
+      console.log('Admin API getDashboard - Headers:', headers);
+      console.log('Admin API getDashboard - Params:', params);
+      
       const response = await axios.get(`${API_BASE_URL}/api/admin/dashboard`, {
         headers,
         params,

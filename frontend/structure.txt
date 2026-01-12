@@ -1,0 +1,64 @@
+.
+├── .clerk
+│   └── .tmp
+│       ├── keyless.json
+│       ├── README.md
+│       └── telemetry.json
+├── .env
+├── .env.local
+├── .gitignore
+├── app
+│   ├── admin
+│   │   └── page.tsx
+│   ├── complaints
+│   │   ├── [id]
+│   │   │   └── page.tsx
+│   │   ├── file
+│   │   │   └── page.tsx
+│   │   ├── page.tsx
+│   │   └── track
+│   │       ├── [id]
+│   │       │   └── page.tsx
+│   │       └── page.tsx
+│   ├── globals.css
+│   ├── layout.tsx
+│   ├── map
+│   │   └── page.tsx
+│   ├── page.tsx
+│   ├── sign-in
+│   │   └── [[...sign-in]]
+│   │       └── page.tsx
+│   └── sign-up
+│       └── [[...sign-up]]
+│           └── page.tsx
+├── components
+│   ├── AdminComplaints.tsx
+│   ├── AdminDashboard.tsx
+│   ├── AdminStats.tsx
+│   ├── ComplaintDetail.tsx
+│   ├── ComplaintList.tsx
+│   ├── EnhancedMap.tsx
+│   ├── FeatureToggles.tsx
+│   ├── FileComplaint.tsx
+│   ├── GoogleMapEnhanced.tsx
+│   ├── Home.tsx
+│   ├── Map.tsx
+│   ├── MapModeToggle.tsx
+│   ├── NotificationBroadcast.tsx
+│   ├── RouteCalculator.tsx
+│   ├── Sidebar.tsx
+│   ├── SOSBroadcast.tsx
+│   ├── StatsPanel.tsx
+│   └── WardRiskPanel.tsx
+├── lib
+│   └── api.ts
+├── next-env.d.ts
+├── next.config.js
+├── package-lock.json
+├── package.json
+├── postcss.config.js
+├── structure.txt
+├── tailwind.config.js
+└── tsconfig.json
+
+17 directories, 45 files

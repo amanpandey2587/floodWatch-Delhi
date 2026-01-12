@@ -12,6 +12,25 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Custom scrollbar for sidebar panels */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
 @keyframes pulse {
   0%, 100% {
     opacity: 1;
@@ -27,3 +46,16 @@ body {
   animation: pulse 2s infinite;
 }
 
+/* Prevent map controls from interfering with UI */
+.leaflet-container {
+  z-index: 0 !important;
+}
+
+.leaflet-control-container {
+  z-index: 10 !important;
+}
+
+/* Ensure proper stacking context for map popups */
+.leaflet-popup-pane {
+  z-index: 15 !important;
+}

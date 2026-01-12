@@ -15,14 +15,18 @@ class ComplaintPriority(str, Enum):
     HIGH = "high"
     URGENT = "urgent"
 
+class LocationData(BaseModel):
+    latitude: float
+    longitude: float
+
 class ComplaintCreate(BaseModel):
     title: str = Field(..., min_length=5, max_length=200)
     description: str = Field(..., min_length=10, max_length=2000)
     category: str = Field(..., min_length=3, max_length=50)
     ward_number: int = Field(..., ge=1, le=272)
-    location: Optional[Dict[str, float]] = None
+    location: Optional[LocationData] = None
     priority: ComplaintPriority = ComplaintPriority.MEDIUM
-    attachments: Optional[List[str]] = []  # Base64 encoded images
+    attachments: Optional[List[str]] = []
 
 class ComplaintUpdate(BaseModel):
     status: Optional[ComplaintStatus] = None

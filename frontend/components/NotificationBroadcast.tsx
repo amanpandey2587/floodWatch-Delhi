@@ -19,15 +19,8 @@ export default function NotificationBroadcast({ onSuccess }: NotificationBroadca
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const userWardNumber = user?.publicMetadata?.ward_number as number | undefined;
-  const role = (user?.publicMetadata?.role as string) || 'citizen';
-
-  // Auto-set ward number if user is ward_admin
-  useEffect(() => {
-    if (userWardNumber && role === 'ward_admin') {
-      setWardNumber(userWardNumber);
-    }
-  }, [userWardNumber, role]);
+  // TEMPORARY: For testing - always ward 44, but allow changing
+  const role = 'ward_admin'; // Can be changed to 'admin' to allow ward selection
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,25 +47,33 @@ export default function NotificationBroadcast({ onSuccess }: NotificationBroadca
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Send Ward Notification</h2>
+      <div className="flex items-center gap-2 mb-4">
+        <div className="p-2 bg-blue-100 rounded-lg">
+          <Send className="w-6 h-6 text-blue-600" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Ward Notification</h2>
+          <p className="text-sm text-gray-600">Send updates to ward residents</p>
+        </div>
+      </div>
       
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4 flex items-center gap-2">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 flex items-center gap-2">
           <AlertCircle className="w-5 h-5" />
           {error}
         </div>
       )}
       
       {success && (
-        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded mb-4">
-          Notification sent successfully!
+        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-4">
+          ✅ Notification sent successfully to Ward {wardNumber}!
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="ward_number" className="block text-sm font-medium text-gray-700 mb-2">
-            Ward Number
+            Ward Number <span className="text-red-600">*</span>
           </label>
           <input
             type="number"
@@ -82,17 +83,19 @@ export default function NotificationBroadcast({ onSuccess }: NotificationBroadca
             required
             min="1"
             max="272"
-            disabled={role === 'ward_admin'} // Ward admins can only broadcast to their ward
+            disabled={role === 'ward_admin'} // Locked for ward admins
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
           />
           {role === 'ward_admin' && (
-            <p className="mt-1 text-sm text-gray-500">You can only broadcast to your assigned ward</p>
+            <p className="mt-1 text-sm text-gray-500">
+              Ward admins can only broadcast to their assigned ward
+            </p>
           )}
         </div>
 
         <div>
           <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
-            Title
+            Title <span className="text-red-600">*</span>
           </label>
           <input
             type="text"
@@ -104,11 +107,12 @@ export default function NotificationBroadcast({ onSuccess }: NotificationBroadca
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="e.g., Waterlogging Alert"
           />
+          <p className="mt-1 text-sm text-gray-500">{title.length}/100 characters</p>
         </div>
 
         <div>
           <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">
-            Message
+            Message <span className="text-red-600">*</span>
           </label>
           <textarea
             id="message"
@@ -125,7 +129,7 @@ export default function NotificationBroadcast({ onSuccess }: NotificationBroadca
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !title.trim() || !message.trim()}
           className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {loading ? (

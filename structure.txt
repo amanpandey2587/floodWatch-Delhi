@@ -1,0 +1,90 @@
+.
+├── .gitignore
+├── backend
+│   ├── .gitignore
+│   ├── admin.py
+│   ├── complaints_db.json
+│   ├── complaints_db.py
+│   ├── complaints.py
+│   ├── crowdsource.py
+│   ├── delhi_data
+│   │   └── grid_cache.json
+│   ├── firebase-service-account.json
+│   ├── hotspots.py
+│   ├── main.py
+│   ├── model.py
+│   ├── models.py
+│   ├── notifications.py
+│   ├── preparedness.py
+│   ├── requirements.txt
+│   └── wards.py
+├── fast
+│   └── main.py
+├── FILES_RECREATED.md
+├── frontend
+│   ├── .clerk
+│   │   └── .tmp
+│   │       ├── keyless.json
+│   │       ├── README.md
+│   │       └── telemetry.json
+│   ├── .gitignore
+│   ├── app
+│   │   ├── admin
+│   │   │   └── page.tsx
+│   │   ├── complaints
+│   │   │   ├── [id]
+│   │   │   │   └── page.tsx
+│   │   │   ├── file
+│   │   │   │   └── page.tsx
+│   │   │   ├── page.tsx
+│   │   │   └── track
+│   │   │       ├── [id]
+│   │   │       │   └── page.tsx
+│   │   │       └── page.tsx
+│   │   ├── globals.css
+│   │   ├── layout.tsx
+│   │   ├── map
+│   │   │   └── page.tsx
+│   │   ├── page.tsx
+│   │   ├── sign-in
+│   │   │   └── [[...sign-in]]
+│   │   │       └── page.tsx
+│   │   └── sign-up
+│   │       └── [[...sign-up]]
+│   │           └── page.tsx
+│   ├── components
+│   │   ├── AdminComplaints.tsx
+│   │   ├── AdminDashboard.tsx
+│   │   ├── AdminStats.tsx
+│   │   ├── ComplaintDetail.tsx
+│   │   ├── ComplaintList.tsx
+│   │   ├── EnhancedMap.tsx
+│   │   ├── FeatureToggles.tsx
+│   │   ├── FileComplaint.tsx
+│   │   ├── Home.tsx
+│   │   ├── Map.tsx
+│   │   ├── NotificationBroadcast.tsx
+│   │   ├── RouteCalculator.tsx
+│   │   ├── Sidebar.tsx
+│   │   ├── SOSBroadcast.tsx
+│   │   ├── StatsPanel.tsx
+│   │   └── WardRiskPanel.tsx
+│   ├── lib
+│   │   └── api.ts
+│   ├── next.config.js
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── postcss.config.js
+│   ├── tailwind.config.js
+│   └── tsconfig.json
+├── mobile
+│   ├── .expo
+│   │   ├── devices.json
+│   │   ├── README.md
+│   │   └── types
+│   │       └── router.d.ts
+│   └── expo-env.d.ts
+├── README.md
+└── structure.txt
+
+24 directories, 64 files

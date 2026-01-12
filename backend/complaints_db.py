@@ -14,6 +14,16 @@ def file_complaint(complaint_data: ComplaintCreate, user_id: str) -> dict:
     """File a new complaint"""
     complaint_id = f"COMP-{uuid.uuid4().hex[:8].upper()}"
     
+    # Convert location to dict if it's a Pydantic model
+    location_dict = None
+    if complaint_data.location:
+        if hasattr(complaint_data.location, 'model_dump'):
+            location_dict = complaint_data.location.model_dump()  # Pydantic v2
+        elif hasattr(complaint_data.location, 'dict'):
+            location_dict = complaint_data.location.dict()  # Pydantic v1
+        else:
+            location_dict = complaint_data.location  # Already a dict
+    
     complaint = {
         "complaint_id": complaint_id,
         "title": complaint_data.title,
@@ -24,7 +34,7 @@ def file_complaint(complaint_data: ComplaintCreate, user_id: str) -> dict:
         "priority": complaint_data.priority.value,
         "created_by": user_id,
         "assigned_officer_id": None,
-        "location": complaint_data.location,
+        "location": location_dict,  # Use the dict version
         "attachments": complaint_data.attachments or [],
         "timeline": [{
             "timestamp": datetime.now(),
@@ -52,7 +62,6 @@ def file_complaint(complaint_data: ComplaintCreate, user_id: str) -> dict:
     complaint["updated_at"] = datetime.now().isoformat()
     
     return complaint
-
 def auto_assign_complaint(complaint_id: str, ward_number: int):
     """Auto-assign complaint to ward admin (placeholder)"""
     # In future, assign to specific ward officer
