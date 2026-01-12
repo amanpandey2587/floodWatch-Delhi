@@ -24,6 +24,8 @@ def file_complaint(complaint_data: ComplaintCreate, user_id: str) -> dict:
         else:
             location_dict = complaint_data.location  # Already a dict
     
+    now = datetime.now()
+    
     complaint = {
         "complaint_id": complaint_id,
         "title": complaint_data.title,
@@ -34,10 +36,10 @@ def file_complaint(complaint_data: ComplaintCreate, user_id: str) -> dict:
         "priority": complaint_data.priority.value,
         "created_by": user_id,
         "assigned_officer_id": None,
-        "location": location_dict,  # Use the dict version
+        "location": location_dict,
         "attachments": complaint_data.attachments or [],
         "timeline": [{
-            "timestamp": datetime.now(),
+            "timestamp": now,  # Keep as datetime for MongoDB
             "status": ComplaintStatus.PENDING.value,
             "remarks": "Complaint filed",
             "updated_by": user_id
@@ -45,10 +47,12 @@ def file_complaint(complaint_data: ComplaintCreate, user_id: str) -> dict:
         "response_time_hours": None,
         "resolution": None,
         "rating": None,
-        "feedback": None
+        "feedback": None,
+        "created_at": now,  # Keep as datetime for MongoDB
+        "updated_at": now   # Keep as datetime for MongoDB
     }
     
-    # Save to MongoDB
+    # Save to MongoDB (this adds the datetime objects)
     ComplaintModel.create(complaint)
     
     # Auto-assign to ward officer
@@ -57,11 +61,11 @@ def file_complaint(complaint_data: ComplaintCreate, user_id: str) -> dict:
     # Create notification for ward admin
     create_notification_for_ward_admin(complaint_data.ward_number, complaint_id, complaint_data.title)
     
-    # Convert datetime to ISO for response
-    complaint["created_at"] = datetime.now().isoformat()
-    complaint["updated_at"] = datetime.now().isoformat()
+    # NOW get the complaint back and convert datetimes for response
+    saved_complaint = get_complaint_by_id(complaint_id)
     
-    return complaint
+    return saved_complaint  # This already has ISO formatted dates
+
 def auto_assign_complaint(complaint_id: str, ward_number: int):
     """Auto-assign complaint to ward admin (placeholder)"""
     # In future, assign to specific ward officer

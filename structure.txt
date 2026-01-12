@@ -1,6 +1,17 @@
 .
 ├── .gitignore
 ├── backend
+│   ├── __pycache__
+│   │   ├── admin.cpython-311.pyc
+│   │   ├── complaints_db.cpython-311.pyc
+│   │   ├── complaints.cpython-311.pyc
+│   │   ├── crowdsource.cpython-311.pyc
+│   │   ├── hotspots.cpython-311.pyc
+│   │   ├── models.cpython-311.pyc
+│   │   ├── notifications.cpython-311.pyc
+│   │   ├── preparedness.cpython-311.pyc
+│   │   └── wards.cpython-311.pyc
+│   ├── .env
 │   ├── .gitignore
 │   ├── admin.py
 │   ├── complaints_db.json
@@ -27,6 +38,8 @@
 │   │       ├── keyless.json
 │   │       ├── README.md
 │   │       └── telemetry.json
+│   ├── .env
+│   ├── .env.local
 │   ├── .gitignore
 │   ├── app
 │   │   ├── admin
@@ -61,8 +74,10 @@
 │   │   ├── EnhancedMap.tsx
 │   │   ├── FeatureToggles.tsx
 │   │   ├── FileComplaint.tsx
+│   │   ├── GoogleMapEnhanced.tsx
 │   │   ├── Home.tsx
 │   │   ├── Map.tsx
+│   │   ├── MapModeToggle.tsx
 │   │   ├── NotificationBroadcast.tsx
 │   │   ├── RouteCalculator.tsx
 │   │   ├── Sidebar.tsx
@@ -71,10 +86,12 @@
 │   │   └── WardRiskPanel.tsx
 │   ├── lib
 │   │   └── api.ts
+│   ├── next-env.d.ts
 │   ├── next.config.js
 │   ├── package-lock.json
 │   ├── package.json
 │   ├── postcss.config.js
+│   ├── structure.txt
 │   ├── tailwind.config.js
 │   └── tsconfig.json
 ├── mobile
@@ -87,4 +104,4 @@
 ├── README.md
 └── structure.txt
 
-24 directories, 64 files
+25 directories, 80 files
