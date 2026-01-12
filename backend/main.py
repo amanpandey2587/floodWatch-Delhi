@@ -1,3 +1,6 @@
+from fastapi.encoders import jsonable_encoder
+from datetime import datetime
+import json
 from fastapi import FastAPI, HTTPException, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -300,15 +303,27 @@ def broadcast_sos(request: SOSRequest):
 # COMPLAINT API ENDPOINTS
 # ============================================================================
 
+# Add this custom JSON encoder class at the top of main.py
+class DateTimeEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
+
+# Then in your create_complaint endpoint, wrap the response:
 @app.post("/api/complaints")
 async def create_complaint(
     complaint: ComplaintCreate, 
-    user_id: Optional[str] = Header(None, alias="X-User-ID")  # Changed!
+    user_id: Optional[str] = Header(None, alias="X-User-ID")
 ):
     """File a new complaint"""
     try:
-        effective_user_id = user_id or "anonymous-user"  # Fallback
+        effective_user_id = user_id or "anonymous-user"
         result = file_complaint(complaint, effective_user_id)
+        
+        # Convert any datetime objects to ISO strings
+        result = jsonable_encoder(result)
+        
         return JSONResponse(status_code=201, content=result)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
