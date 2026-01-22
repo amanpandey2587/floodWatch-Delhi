@@ -12,6 +12,7 @@
     "@clerk/nextjs": "^6.36.7",
     "@react-google-maps/api": "^2.20.8",
     "axios": "^1.13.2",
+    "floodwatch-delhi-frontend": "file:",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.294.0",
     "next": "14.0.4",
@@ -20,6 +21,7 @@
     "react-leaflet": "^4.2.1"
   },
   "devDependencies": {
+    "@types/google.maps": "^3.58.1",
     "@types/leaflet": "^1.9.8",
     "@types/node": "^20.10.5",
     "@types/react": "^18.2.45",

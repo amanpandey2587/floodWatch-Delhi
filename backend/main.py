@@ -1,3 +1,12 @@
+from fastapi import FastAPI, Query, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+import geopandas as gpd
+import json
+from pathlib import Path
+from shapely.geometry import LineString
+import requests
+from typing import List, Tuple
 from fastapi.encoders import jsonable_encoder
 from datetime import datetime
 import json
@@ -29,15 +38,27 @@ from notifications import create_ward_broadcast, get_user_notifications, get_war
 from models import UserModel, NotificationModel
 from admin import get_admin_dashboard_stats, get_recent_complaints
 
-app = FastAPI(title="FloodWatch Delhi API")
+# app = FastAPI(title="FloodWatch Delhi API")
 
+app = FastAPI(title="Delhi Water-logging API")
+
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+MAPBOX_TOKEN = "pk.eyJ1IjoicHNoMjAwNSIsImEiOiJjbWs2bHBzc3IwMnF3M2RzZGEwZGZnMTc5In0.2bLusixeqW_cy9oLbRbNAw"
+DATA_DIR = Path("./east_delhi_data")
+
+# Global variables
+grid_data = None
+wards_data = None
+drains_data = None
+grid_gdf = None
 
 model = None
 model_path = "flood_model.pkl"
@@ -89,6 +110,32 @@ class CrowdsourceResponse(BaseModel):
 class SOSRequest(BaseModel):
     ward_id: str
     message: str
+
+
+
+@app.on_event("startup")
+async def load_geojson_data():
+    global grid_data, wards_data, drains_data, grid_gdf
+    print("Loading GeoJSON files...")
+    
+    # Load grid with risk
+    grid_gdf = gpd.read_file(DATA_DIR / "grid_with_risk.geojson")
+    grid_data = json.loads(grid_gdf.to_json())
+    
+    # Load wards
+    wards_gdf = gpd.read_file(DATA_DIR / "wards_with_risk.geojson")
+    wards_data = json.loads(wards_gdf.to_json())
+    
+    # Load drains (if exists)
+    drain_file = DATA_DIR / "east_drains.geojson"
+    if drain_file.exists():
+        drains_gdf = gpd.read_file(drain_file)
+        drains_data = json.loads(drains_gdf.to_json())
+    
+    print(f"✓ Loaded {len(grid_gdf)} grid cells")
+    print(f"✓ Loaded {len(wards_gdf)} wards")
+    print("✓ Data ready to serve")
+
 
 def predict_risk_dummy(rainfall: float, elevation: float, drainage_score: float) -> tuple:
     risk_score = 0.0
@@ -299,11 +346,6 @@ def broadcast_sos(request: SOSRequest):
         "timestamp": int(time.time())
     }
 
-# ============================================================================
-# COMPLAINT API ENDPOINTS
-# ============================================================================
-
-# Add this custom JSON encoder class at the top of main.py
 class DateTimeEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, datetime):
@@ -474,10 +516,6 @@ async def get_ward_complaints(ward_number: int):
     complaints = get_complaints_by_ward(ward_number)
     return {"complaints": complaints, "count": len(complaints)}
 
-# ============================================================================
-# NOTIFICATION API ENDPOINTS
-# ============================================================================
-
 @app.post("/api/notifications/broadcast")
 async def broadcast_notification(
     notification_data: dict,
@@ -540,11 +578,6 @@ async def mark_all_notifications_read(
         return {"success": True, "marked_count": count}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-# ============================================================================
-# USER API ENDPOINTS
-# ============================================================================
-
 @app.post("/api/users/register")
 async def register_user(
     user_data: dict,
@@ -669,6 +702,355 @@ async def admin_broadcast(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
+
+def check_route_risk(route_geometry: List[Tuple[float, float]]) -> dict:
+    """Calculate risk score for a route"""
+    if grid_gdf is None or len(route_geometry) == 0:
+        return {"avg_risk": 0, "risk_segments": []}
+    
+    # Create route line
+    route_line = LineString([(lon, lat) for lon, lat in route_geometry])
+    route_buffer = route_line.buffer(0.001)  # ~100m buffer
+    
+    # Find intersecting cells
+    intersecting = grid_gdf[grid_gdf.geometry.intersects(route_buffer)]
+    
+    if len(intersecting) == 0:
+        return {"avg_risk": 0, "risk_segments": []}
+    
+    total_risk = 0
+    risk_segments = []
+    
+    for idx, cell in intersecting.iterrows():
+        risk = cell['risk_score']
+        if risk > 0.5:  # High risk threshold
+            risk_segments.append({
+                'lat': float(cell['center_lat']),
+                'lon': float(cell['center_lon']),
+                'risk': float(risk),
+                'category': str(cell['risk_category'])
+            })
+        total_risk += risk
+    
+    avg_risk = total_risk / len(intersecting)
+    
+    return {
+        "avg_risk": float(avg_risk),
+        "risk_segments": risk_segments
+    }
+
+@app.get("/")
+async def root():
+    return {
+        "message": "Delhi Water-logging Risk API",
+        "endpoints": {
+            "grid": "/api/grid",
+            "wards": "/api/wards",
+            "drains": "/api/drains",
+            "stats": "/api/stats",
+            "high-risk": "/api/high-risk",
+            "route": "/api/route",
+            "alternatives": "/api/route/alternatives"
+        }
+    }
+
+@app.get("/api/route")
+async def get_route(
+    start_lat: float = Query(..., description="Start latitude"),
+    start_lon: float = Query(..., description="Start longitude"),
+    end_lat: float = Query(..., description="End latitude"),
+    end_lon: float = Query(..., description="End longitude"),
+    profile: str = Query("driving", description="Travel mode: driving, walking, cycling")
+):
+    """Get route from Mapbox with water-logging risk analysis"""
+    if MAPBOX_TOKEN == "YOUR_MAPBOX_TOKEN_HERE":
+        raise HTTPException(
+            status_code=500,
+            detail="Mapbox token not configured on server"
+        )
+    
+    # Validate profile
+    if profile not in ['driving', 'walking', 'cycling']:
+        profile = 'driving'
+    
+    # Build Mapbox request
+    waypoints = f"{start_lon},{start_lat};{end_lon},{end_lat}"
+    url = f"https://api.mapbox.com/directions/v5/mapbox/{profile}/{waypoints}"
+    
+    params = {
+        'access_token': MAPBOX_TOKEN,
+        'geometries': 'geojson',
+        'overview': 'full',
+        'steps': 'true'
+    }
+    
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"Mapbox API error: {response.text}"
+            )
+        
+        data = response.json()
+        
+        if 'routes' not in data or len(data['routes']) == 0:
+            raise HTTPException(
+                status_code=404,
+                detail="No routes found between these points"
+            )
+        
+        route = data['routes'][0]
+        geometry = route['geometry']['coordinates']
+        
+        # Analyze water-logging risk
+        risk_analysis = check_route_risk(geometry)
+        avg_risk = risk_analysis['avg_risk']
+        
+        # Determine risk level
+        if avg_risk < 0.3:
+            risk_level = 'LOW - Safe to travel'
+            color = '#2ecc71'
+        elif avg_risk < 0.5:
+            risk_level = 'MEDIUM - Caution advised'
+            color = '#f1c40f'
+        elif avg_risk < 0.7:
+            risk_level = 'HIGH - Avoid if possible'
+            color = '#e67e22'
+        else:
+            risk_level = 'CRITICAL - Do not travel'
+            color = '#e74c3c'
+        
+        return {
+            "route": {
+                "type": "Feature",
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": geometry
+                },
+                "properties": {
+                    "distance_km": route['distance'] / 1000,
+                    "duration_min": route['duration'] / 60,
+                    "profile": profile
+                }
+            },
+            "risk_analysis": {
+                "avg_risk": avg_risk,
+                "risk_level": risk_level,
+                "color": color,
+                "high_risk_segments": risk_analysis['risk_segments'],
+                "warning_count": len(risk_analysis['risk_segments'])
+            },
+            "waypoints": {
+                "start": {"lat": start_lat, "lon": start_lon},
+                "end": {"lat": end_lat, "lon": end_lon}
+            }
+        }
+    
+    except requests.RequestException as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch route: {str(e)}"
+        )
+
+@app.get("/api/route/alternatives")
+async def get_alternative_routes(
+    start_lat: float,
+    start_lon: float,
+    end_lat: float,
+    end_lon: float,
+    profile: str = "driving"
+):
+    """Get multiple alternative routes and compare their risk levels"""
+    waypoints = f"{start_lon},{start_lat};{end_lon},{end_lat}"
+    url = f"https://api.mapbox.com/directions/v5/mapbox/{profile}/{waypoints}"
+    
+    params = {
+        'access_token': MAPBOX_TOKEN,
+        'geometries': 'geojson',
+        'overview': 'full',
+        'alternatives': 'true',
+        'steps': 'true'
+    }
+    
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        data = response.json()
+        
+        if 'routes' not in data:
+            raise HTTPException(status_code=404, detail="No routes found")
+        
+        routes = []
+        for idx, route in enumerate(data['routes']):
+            geometry = route['geometry']['coordinates']
+            risk_analysis = check_route_risk(geometry)
+            avg_risk = risk_analysis['avg_risk']
+            
+            routes.append({
+                "route_id": idx,
+                "geometry": geometry,
+                "distance_km": route['distance'] / 1000,
+                "duration_min": route['duration'] / 60,
+                "avg_risk": avg_risk,
+                "risk_segments": risk_analysis['risk_segments'],
+                "color": '#2ecc71' if avg_risk < 0.3 else '#f1c40f' if avg_risk < 0.5 else '#e67e22' if avg_risk < 0.7 else '#e74c3c'
+            })
+        
+        # Sort by risk (safest first)
+        routes.sort(key=lambda x: x['avg_risk'])
+        
+        return {
+            "routes": routes,
+            "safest_route_id": routes[0]['route_id'] if routes else None
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/grid")
+async def get_grid_data(
+    limit: int = Query(None, description="Limit number of cells"),
+    risk_min: float = Query(0.0, description="Minimum risk score"),
+    risk_max: float = Query(1.0, description="Maximum risk score")
+):
+    """Get grid cells with optional filtering"""
+    if grid_data is None:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Data not loaded yet"}
+        )
+    
+    # Filter by risk score
+    features = grid_data["features"]
+    filtered_features = [
+        f for f in features
+        if risk_min <= f["properties"].get("risk_score", 0) <= risk_max
+    ]
+    
+    # Apply limit if specified
+    if limit:
+        filtered_features = filtered_features[:limit]
+    
+    return {
+        "type": "FeatureCollection",
+        "features": filtered_features,
+        "metadata": {
+            "total": len(filtered_features),
+            "filtered": len(filtered_features) < len(features)
+        }
+    }
+
+@app.get("/api/wards")
+async def get_wards_data():
+    """Get ward boundaries with aggregated risk"""
+    if wards_data is None:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Data not loaded yet"}
+        )
+    return wards_data
+
+@app.get("/api/drains")
+async def get_drains_data():
+    """Get drainage network"""
+    if drains_data is None:
+        return {"type": "FeatureCollection", "features": []}
+    return drains_data
+
+@app.get("/api/stats")
+async def get_statistics():
+    """Get summary statistics"""
+    if grid_data is None:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Data not loaded yet"}
+        )
+    
+    features = grid_data["features"]
+    risk_scores = [f["properties"].get("risk_score", 0) for f in features]
+    risk_categories = [f["properties"].get("risk_category", "Unknown") for f in features]
+    
+    # Count by category
+    category_counts = {}
+    for cat in risk_categories:
+        category_counts[cat] = category_counts.get(cat, 0) + 1
+    
+    return {
+        "total_cells": len(features),
+        "avg_risk": sum(risk_scores) / len(risk_scores) if risk_scores else 0,
+        "max_risk": max(risk_scores) if risk_scores else 0,
+        "min_risk": min(risk_scores) if risk_scores else 0,
+        "risk_distribution": category_counts,
+        "high_risk_count": sum(1 for score in risk_scores if score > 0.7),
+        "critical_count": sum(1 for score in risk_scores if score > 0.85)
+    }
+
+@app.get("/api/high-risk")
+async def get_high_risk_areas(threshold: float = Query(0.7)):
+    """Get only high-risk cells"""
+    if grid_data is None:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Data not loaded yet"}
+        )
+    
+    high_risk_features = [
+        f for f in grid_data["features"]
+        if f["properties"].get("risk_score", 0) >= threshold
+    ]
+    
+    return {
+        "type": "FeatureCollection",
+        "features": high_risk_features,
+        "metadata": {
+            "threshold": threshold,
+            "count": len(high_risk_features)
+        }
+    }
+
+@app.get("/api/ward/{ward_id}")
+async def get_ward_detail(ward_id: int):
+    """Get details for specific ward"""
+    if grid_data is None or wards_data is None:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Data not loaded yet"}
+        )
+    
+    # Find ward
+    ward = next(
+        (f for f in wards_data["features"]
+         if f["properties"].get("ward_id") == ward_id),
+        None
+    )
+    
+    if not ward:
+        return JSONResponse(
+            status_code=404,
+            content={"error": f"Ward {ward_id} not found"}
+        )
+    
+    # Get cells in this ward
+    ward_cells = [
+        f for f in grid_data["features"]
+        if f["properties"].get("ward_id") == ward_id
+    ]
+    
+    return {
+        "ward": ward,
+        "cells": {
+            "type": "FeatureCollection",
+            "features": ward_cells
+        },
+        "stats": {
+            "total_cells": len(ward_cells),
+            "high_risk_cells": sum(
+                1 for c in ward_cells
+                if c["properties"].get("risk_score", 0) > 0.7
+            )
+        }
+    }
 
 if __name__ == "__main__":
     import uvicorn
