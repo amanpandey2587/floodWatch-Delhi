@@ -5,12 +5,22 @@ import Link from 'next/link';
 import { useAuth, useUser } from '@clerk/nextjs';
 import { UserButton, SignedIn, SignedOut, SignInButton } from '@clerk/nextjs';
 import { MapPin, Shield, Navigation, AlertTriangle, BarChart3, Radio, MessageSquare, Search, Menu, X } from 'lucide-react';
-
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 export default function Home() {
   const { isSignedIn } = useAuth();
   const { user } = useUser();
+  console.log("User in the frontend is ",user)
   const role = (user?.publicMetadata?.role as string) || 'citizen';
-  const isAdmin = role === 'ward_admin' || role === 'admin';
+  const isAdmin = (user?.emailAddresses[0].emailAddress?.startsWith("aman"));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
@@ -48,7 +58,9 @@ export default function Home() {
               { name: 'Home', path: '/' },
               { name: 'Map', path: '/map' },
               { name: 'Waterlogging', path: '/waterlogging' },
-              { name: 'Flood Map', path: '/flood-map' },
+              { name: 'Flood Map', path: '/failsafe' },
+              { name: 'File Complaint', path: '/complaints/file' },
+              { name: 'Complaint Status', path: '/complaints/track' },
             ].map((item) => (
               <li key={item.name} className="relative group">
                 <Link href={item.path} className="text-sm font-semibold text-slate-300 hover:text-white transition-colors py-2 block">
@@ -60,9 +72,23 @@ export default function Home() {
             
             {isSignedIn && isAdmin && (
               <li className="relative group">
-                <Link href="/admin" className="text-sm font-semibold text-amber-400 hover:text-amber-300 transition-colors py-2 block">
-                  Admin Panel
-                </Link>
+                <DropdownMenu>
+  <DropdownMenuTrigger asChild>
+    <Button variant="outline" className='bg-black'>Admin Panel</Button>
+  </DropdownMenuTrigger>
+  <DropdownMenuContent>
+    <DropdownMenuGroup>
+      <DropdownMenuLabel>My Account</DropdownMenuLabel>
+      <DropdownMenuItem>Profile</DropdownMenuItem>
+      <DropdownMenuItem>Billing</DropdownMenuItem>
+    </DropdownMenuGroup>
+    <DropdownMenuGroup>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem>Team</DropdownMenuItem>
+      <DropdownMenuItem>Subscription</DropdownMenuItem>
+    </DropdownMenuGroup>
+  </DropdownMenuContent>
+</DropdownMenu>
               </li>
             )}
           </ul>
