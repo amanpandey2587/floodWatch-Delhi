@@ -12,3 +12,5 @@ google-auth-oauthlib
 google-auth-httplib2
 google-api-python-client
 python-multipart
+openai>=1.0.0
+geopandas

@@ -80,3 +80,55 @@ export const STATUS_LABELS: Record<ComplaintStatus, { label: string; color: stri
   [ComplaintStatus.RESOLVED]: { label: "Resolved", color: "text-green-600 bg-green-100" },
   [ComplaintStatus.CLOSED]: { label: "Closed", color: "text-gray-600 bg-gray-100" }
 };
+
+// Add these new interfaces
+export interface ImageVerificationResult {
+  index: number;
+  is_waterlogging: boolean;
+  confidence: number;
+  severity: "CRITICAL" | "HIGH" | "MODERATE" | "LOW" | "NONE";
+  detected_issues: string[];
+  reasoning: string;
+  false_positive_reason: string | null;
+  passed: boolean;
+}
+
+export interface ImageVerificationSummary {
+  total_images: number;
+  verified_count: number;
+  rejected_count: number;
+  verification_rate: number;
+  average_confidence: number;
+  has_critical: boolean;
+  has_high: boolean;
+  recommendation: "ACCEPT_ALL" | "PARTIAL_ACCEPT" | "REJECT_ALL" | "NO_IMAGES";
+}
+
+export interface ImageVerification {
+  results: ImageVerificationResult[];
+  summary: ImageVerificationSummary | null;
+  verified_at: string | null;
+}
+
+// Update the Complaint interface to include verification
+export interface Complaint {
+  complaint_id: string;
+  title: string;
+  description: string;
+  category: string;
+  ward_number: number;
+  status: ComplaintStatus;
+  priority: ComplaintPriority;
+  created_by: string;
+  assigned_officer_id: string | null;
+  location: LocationData | null;
+  attachments: string[];
+  image_verification?: ImageVerification;  // ADD THIS LINE
+  timeline: TimelineEntry[];
+  response_time_hours: number | null;
+  resolution: string | null;
+  rating: number | null;
+  feedback: string | null;
+  created_at: string;
+  updated_at: string;
+}

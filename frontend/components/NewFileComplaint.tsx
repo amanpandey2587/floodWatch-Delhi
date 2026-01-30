@@ -10,14 +10,21 @@ import {
   AlertCircle, 
   CheckCircle2,
   Loader2,
-  Image as ImageIcon
+  Image as ImageIcon,
+  AlertTriangle,
+  Info,
+  Eye,
+  ShieldCheck,
+  ShieldAlert
 } from "lucide-react";
 import {
   ComplaintFormData,
   ComplaintPriority,
   COMPLAINT_CATEGORIES,
   PRIORITY_LABELS,
-  LocationData
+  LocationData,
+  ImageVerificationResult,
+  ImageVerificationSummary
 } from "@/types/complaint";
 
 interface NewFileComplaintProps {
@@ -54,6 +61,11 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
+
+  // Verification state
+  const [verificationResults, setVerificationResults] = useState<ImageVerificationResult[]>([]);
+  const [verificationSummary, setVerificationSummary] = useState<ImageVerificationSummary | null>(null);
+  const [showVerificationDetails, setShowVerificationDetails] = useState(false);
 
   // Validation state
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -205,6 +217,8 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
   const handleRemoveImage = useCallback((index: number) => {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
     setImagePreviews((prev) => prev.filter((_, i) => i !== index));
+    // Also remove verification result for this image
+    setVerificationResults((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
   // Convert files to base64
@@ -298,10 +312,16 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
 
       console.log("Filing complaint with payload:", payload);
 
-      // Submit complaint
+      // Submit complaint (backend will handle verification)
       const result = await complaintAPI.fileComplaint(payload);
 
       console.log("Complaint filed successfully:", result);
+
+      // Extract verification results from response
+      if (result.image_verification) {
+        setVerificationResults(result.image_verification.results || []);
+        setVerificationSummary(result.image_verification.summary || null);
+      }
 
       // Success!
       setComplaintId(result.complaint_id);
@@ -314,7 +334,7 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
       } else {
         setTimeout(() => {
           router.push(`/complaints/track/${result.complaint_id}`);
-        }, 2000);
+        }, 3000);
       }
     } catch (err: any) {
       console.error("Complaint filing error:", err);
@@ -350,6 +370,17 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
     }
   };
 
+  // Helper function to get severity badge color
+  const getSeverityColor = (severity: string) => {
+    switch (severity) {
+      case "CRITICAL": return "bg-red-100 text-red-800 border-red-200";
+      case "HIGH": return "bg-orange-100 text-orange-800 border-orange-200";
+      case "MODERATE": return "bg-yellow-100 text-yellow-800 border-yellow-200";
+      case "LOW": return "bg-blue-100 text-blue-800 border-blue-200";
+      default: return "bg-gray-100 text-gray-800 border-gray-200";
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="bg-white rounded-xl shadow-lg p-8">
@@ -373,22 +404,136 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
           </div>
         )}
 
-        {/* Success Alert */}
+        {/* Success Alert with Verification Summary */}
         {success && complaintId && (
-          <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
-            <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <h3 className="text-sm font-semibold text-green-900 mb-1">
-                Complaint filed successfully!
-              </h3>
-              <p className="text-sm text-green-700">
-                Your complaint ID is:{" "}
-                <span className="font-mono font-semibold">{complaintId}</span>
-              </p>
-              <p className="text-xs text-green-600 mt-1">
-                Redirecting to tracking page...
-              </p>
+          <div className="mb-6 space-y-4">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
+              <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-green-900 mb-1">
+                  Complaint filed successfully!
+                </h3>
+                <p className="text-sm text-green-700">
+                  Your complaint ID is:{" "}
+                  <span className="font-mono font-semibold">{complaintId}</span>
+                </p>
+                <p className="text-xs text-green-600 mt-1">
+                  Redirecting to tracking page...
+                </p>
+              </div>
             </div>
+
+            {/* Verification Summary */}
+            {verificationSummary && verificationSummary.total_images > 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <ShieldCheck className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="text-sm font-semibold text-blue-900 mb-2">
+                      AI Verification Complete
+                    </h3>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <span className="text-blue-700">Total Images:</span>{" "}
+                        <span className="font-semibold text-blue-900">
+                          {verificationSummary.total_images}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-blue-700">Verified:</span>{" "}
+                        <span className="font-semibold text-green-900">
+                          {verificationSummary.verified_count}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-blue-700">Confidence:</span>{" "}
+                        <span className="font-semibold text-blue-900">
+                          {verificationSummary.average_confidence}%
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-blue-700">Verification Rate:</span>{" "}
+                        <span className="font-semibold text-blue-900">
+                          {verificationSummary.verification_rate}%
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {verificationSummary.has_critical && (
+                      <div className="mt-2 flex items-center gap-2 text-sm text-red-700">
+                        <AlertTriangle className="w-4 h-4" />
+                        <span>Critical waterlogging detected in images</span>
+                      </div>
+                    )}
+                    
+                    <button
+                      onClick={() => setShowVerificationDetails(!showVerificationDetails)}
+                      className="mt-3 text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+                    >
+                      <Eye className="w-4 h-4" />
+                      {showVerificationDetails ? "Hide" : "View"} detailed results
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Detailed Verification Results */}
+            {showVerificationDetails && verificationResults.length > 0 && (
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-gray-900 mb-3">
+                  Verification Results Per Image
+                </h4>
+                <div className="space-y-3">
+                  {verificationResults.map((result, index) => (
+                    <div
+                      key={index}
+                      className={`p-3 rounded-lg border ${
+                        result.passed
+                          ? "bg-green-50 border-green-200"
+                          : "bg-orange-50 border-orange-200"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-900">
+                          Image {index + 1}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`text-xs px-2 py-1 rounded border ${getSeverityColor(
+                              result.severity
+                            )}`}
+                          >
+                            {result.severity}
+                          </span>
+                          <span className="text-xs text-gray-600">
+                            {result.confidence}% confidence
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <p className="text-sm text-gray-700 mb-2">
+                        {result.reasoning}
+                      </p>
+                      
+                      {result.detected_issues.length > 0 && (
+                        <div className="text-xs text-gray-600">
+                          <span className="font-medium">Detected: </span>
+                          {result.detected_issues.join(", ")}
+                        </div>
+                      )}
+                      
+                      {result.false_positive_reason && (
+                        <div className="text-xs text-orange-700 mt-1">
+                          <span className="font-medium">Note: </span>
+                          {result.false_positive_reason}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -619,11 +764,32 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
             )}
           </div>
 
-          {/* Photo Upload */}
+          {/* Photo Upload with AI Verification Info */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Photos (Optional, max {MAX_FILES})
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Photos (Optional, max {MAX_FILES})
+              </label>
+              <div className="flex items-center gap-1 text-xs text-blue-600">
+                <ShieldCheck className="w-4 h-4" />
+                <span>AI-verified</span>
+              </div>
+            </div>
+            
+            {/* AI Verification Info Banner */}
+            <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <Info className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div className="text-xs text-blue-800">
+                  <p className="font-medium mb-1">AI Image Verification Enabled</p>
+                  <p>
+                    Images will be automatically verified for waterlogging detection using
+                    AI. This helps ensure accurate reporting and faster response times.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div className="space-y-4">
               <label
                 htmlFor="file-upload"
@@ -659,7 +825,7 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
               {loading && uploadProgress > 0 && uploadProgress < 100 && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Uploading images...</span>
+                    <span className="text-gray-600">Processing images...</span>
                     <span className="text-gray-900 font-medium">
                       {uploadProgress}%
                     </span>
@@ -746,7 +912,7 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
             </p>
             <p className="text-xs text-gray-500 mt-2">
               Your complaint will be assigned to the ward officer for immediate action.
-              You'll receive updates via notifications.
+              Images are automatically verified using AI to ensure accurate reporting.
             </p>
           </div>
         </form>

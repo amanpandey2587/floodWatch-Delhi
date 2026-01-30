@@ -8,21 +8,39 @@ from models import ComplaintModel
 from notifications import create_notification_for_ward_admin, create_complaint_status_notification
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+from image_verification import verify_images_batch, get_verification_summary
 import uuid
 
+# Update the file_complaint function
 def file_complaint(complaint_data: ComplaintCreate, user_id: str) -> dict:
-    """File a new complaint"""
+    """File a new complaint with AI image verification"""
     complaint_id = f"COMP-{uuid.uuid4().hex[:8].upper()}"
+    
+    # AI IMAGE VERIFICATION
+    verification_results = []
+    verification_summary = None
+    
+    if complaint_data.attachments and len(complaint_data.attachments) > 0:
+        print(f"[FileComplaint] Verifying {len(complaint_data.attachments)} images for complaint {complaint_id}")
+        try:
+            verification_results = verify_images_batch(complaint_data.attachments)
+            verification_summary = get_verification_summary(verification_results)
+            print(f"[FileComplaint] Verification summary: {verification_summary}")
+        except Exception as e:
+            print(f"[FileComplaint] WARNING: Image verification failed: {e}")
+            # Continue without verification if it fails (graceful degradation)
+            verification_results = []
+            verification_summary = None
     
     # Convert location to dict if it's a Pydantic model
     location_dict = None
     if complaint_data.location:
         if hasattr(complaint_data.location, 'model_dump'):
-            location_dict = complaint_data.location.model_dump()  # Pydantic v2
+            location_dict = complaint_data.location.model_dump()
         elif hasattr(complaint_data.location, 'dict'):
-            location_dict = complaint_data.location.dict()  # Pydantic v1
+            location_dict = complaint_data.location.dict()
         else:
-            location_dict = complaint_data.location  # Already a dict
+            location_dict = complaint_data.location
     
     now = datetime.now()
     
@@ -38,21 +56,29 @@ def file_complaint(complaint_data: ComplaintCreate, user_id: str) -> dict:
         "assigned_officer_id": None,
         "location": location_dict,
         "attachments": complaint_data.attachments or [],
+        "image_verification": {  # ADD THIS FIELD
+            "results": verification_results,
+            "summary": verification_summary,
+            "verified_at": now.isoformat() if verification_results else None
+        },
         "timeline": [{
-            "timestamp": now,  # Keep as datetime for MongoDB
+            "timestamp": now,
             "status": ComplaintStatus.PENDING.value,
-            "remarks": "Complaint filed",
+            "remarks": "Complaint filed" + (
+                f" - {verification_summary['verified_count']}/{verification_summary['total_images']} images verified"
+                if verification_summary else ""
+            ),
             "updated_by": user_id
         }],
         "response_time_hours": None,
         "resolution": None,
         "rating": None,
         "feedback": None,
-        "created_at": now,  # Keep as datetime for MongoDB
-        "updated_at": now   # Keep as datetime for MongoDB
+        "created_at": now,
+        "updated_at": now
     }
     
-    # Save to MongoDB (this adds the datetime objects)
+    # Save to MongoDB
     ComplaintModel.create(complaint)
     
     # Auto-assign to ward officer
@@ -61,10 +87,10 @@ def file_complaint(complaint_data: ComplaintCreate, user_id: str) -> dict:
     # Create notification for ward admin
     create_notification_for_ward_admin(complaint_data.ward_number, complaint_id, complaint_data.title)
     
-    # NOW get the complaint back and convert datetimes for response
+    # Get the complaint back with ISO formatted dates
     saved_complaint = get_complaint_by_id(complaint_id)
     
-    return saved_complaint  # This already has ISO formatted dates
+    return saved_complaint
 
 def auto_assign_complaint(complaint_id: str, ward_number: int):
     """Auto-assign complaint to ward admin (placeholder)"""
