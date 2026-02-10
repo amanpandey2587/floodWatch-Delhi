@@ -16,6 +16,14 @@ interface Complaint {
   priority: string;
   created_at: string;
   location?: { latitude: number; longitude: number };
+  water_depth?: string | null;
+  sla_info?: {
+    elapsed_hours: number;
+    remaining_hours: number;
+    sla_status: string;
+    sla_percentage: number;
+    target_hours: number;
+  };
 }
 
 export default function ComplaintList({ filterStatus }: { filterStatus?: string }) {
@@ -33,7 +41,7 @@ export default function ComplaintList({ filterStatus }: { filterStatus?: string 
       try {
         setLoading(true);
         setError(null);
-        
+
         const filters: any = {};
         if (role === 'ward_admin' && wardNumber) {
           filters.ward_number = wardNumber;
@@ -41,14 +49,14 @@ export default function ComplaintList({ filterStatus }: { filterStatus?: string 
         if (filterStatus) {
           filters.status = filterStatus;
         }
-        
+
         const result = await complaintAPI.getComplaints(filters);
         let complaintsList = result.complaints || result || [];
-        
+
         if (filterStatus) {
           complaintsList = complaintsList.filter((c: Complaint) => c.status === filterStatus);
         }
-        
+
         setComplaints(complaintsList);
       } catch (err: any) {
         setError(err.response?.data?.detail || 'Failed to load complaints');
@@ -127,6 +135,32 @@ export default function ComplaintList({ filterStatus }: { filterStatus?: string 
     }
   };
 
+  const getSLAColor = (status: string) => {
+    switch (status) {
+      case 'within_sla': return '#22c55e'; // green
+      case 'approaching_sla': return '#eab308'; // yellow
+      case 'sla_breached': return '#ef4444'; // red
+      case 'met': return '#22c55e'; // green
+      case 'breached': return '#ef4444'; // red
+      default: return '#6b7280';
+    }
+  };
+
+  const getTimeAgo = (dateString: string) => {
+    try {
+      const now = new Date();
+      const created = new Date(dateString);
+      const diffMs = now.getTime() - created.getTime();
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+      if (diffHours > 0) return `${diffHours}h ${diffMins}m ago`;
+      return `${diffMins}m ago`;
+    } catch {
+      return '';
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -198,6 +232,44 @@ export default function ComplaintList({ filterStatus }: { filterStatus?: string 
                 </span>
                 <span className="capitalize">{complaint.category}</span>
               </div>
+
+              {/* SLA Tracking */}
+              {complaint.sla_info && (
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  <div className="flex items-center justify-between text-xs mb-2">
+                    <div className="flex items-center gap-2 text-gray-600">
+                      <Clock className="w-3 h-3" style={{ color: getSLAColor(complaint.sla_info.sla_status) }} />
+                      <span>Reported {getTimeAgo(complaint.created_at)}</span>
+                    </div>
+                    <span
+                      className="font-semibold"
+                      style={{ color: getSLAColor(complaint.sla_info.sla_status) }}
+                    >
+                      {complaint.status !== 'resolved'
+                        ? `${Math.floor(complaint.sla_info.remaining_hours)}h remaining`
+                        : complaint.sla_info.sla_status === 'met' ? 'SLA Met ✓' : 'SLA Breached'
+                      }
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{
+                        width: `${Math.min(100, complaint.sla_info.sla_percentage)}%`,
+                        backgroundColor: getSLAColor(complaint.sla_info.sla_status)
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Water Depth Marker */}
+              {complaint.water_depth && (
+                <div className="mt-2 flex items-center gap-2 text-xs">
+                  <span className="text-gray-500">Water:</span>
+                  <span className="font-semibold text-blue-600">{complaint.water_depth}</span>
+                </div>
+              )}
             </div>
             <div className="ml-4 text-right">
               <span className="text-sm font-mono text-gray-500">{complaint.complaint_id}</span>

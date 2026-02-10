@@ -59,6 +59,7 @@ export default function Home() {
               { name: 'Map', path: '/map' },
               { name: 'Waterlogging', path: '/waterlogging' },
               { name: 'Flood Map', path: '/failsafe' },
+              { name: 'Safe Parking', path: '/safe-parking' },
               { name: 'File Complaint', path: '/complaints/file' },
               { name: 'Complaint Status', path: '/complaints/track' },
             ].map((item) => (
@@ -287,6 +288,7 @@ export default function Home() {
                     <ul className="space-y-2 text-sm text-slate-400">
                         <li><Link href="/" className="hover:text-cyan-400">Home</Link></li>
                         <li><Link href="/map" className="hover:text-cyan-400">Live Map</Link></li>
+                        <li><Link href="/safe-parking" className="hover:text-cyan-400">Safe Parking</Link></li>
                         <li><Link href="/flood-map" className="hover:text-cyan-400">Prediction Model</Link></li>
                     </ul>
                 </div>

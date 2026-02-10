@@ -15,6 +15,13 @@ class ComplaintPriority(str, Enum):
     HIGH = "high"
     URGENT = "urgent"
 
+class WaterDepth(str, Enum):
+    ANKLE_DEEP = "Ankle Deep"
+    KNEE_DEEP = "Knee Deep"
+    TYRE_DEEP = "Tyre Deep"
+    HOOD_DEEP = "Hood Deep"
+    FULLY_SUBMERGED = "Fully Submerged"
+
 class LocationData(BaseModel):
     latitude: float
     longitude: float
@@ -27,6 +34,7 @@ class ComplaintCreate(BaseModel):
     location: Optional[LocationData] = None
     priority: ComplaintPriority = ComplaintPriority.MEDIUM
     attachments: Optional[List[str]] = []
+    water_depth: Optional[WaterDepth] = None
 
 class ComplaintUpdate(BaseModel):
     status: Optional[ComplaintStatus] = None

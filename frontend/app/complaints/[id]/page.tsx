@@ -1,6 +1,7 @@
 'use client';
 
 import ComplaintDetail from '@/components/ComplaintDetail';
+import { useParams } from 'next/navigation';
 import { use } from 'react';
 
 interface PageProps {
@@ -9,7 +10,10 @@ interface PageProps {
 
 export default function TrackComplaintDetailPage({ params }: PageProps) {
   // Use React's use() hook to unwrap the Promise
-  const { id } = use(params);
+  // const { id } = use(params);
+  const {id}=useParams();
+  console.log(id);
+  console.log(params)
   
   return (
     <div className="min-h-screen bg-gray-50 py-12">

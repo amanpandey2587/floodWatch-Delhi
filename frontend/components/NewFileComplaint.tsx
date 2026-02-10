@@ -3,11 +3,11 @@
 import { useState, useCallback } from "react";
 import { useComplaintAPI } from "@/lib/api";
 import { useRouter } from "next/navigation";
-import { 
-  Camera, 
-  XCircle, 
-  MapPin, 
-  AlertCircle, 
+import {
+  Camera,
+  XCircle,
+  MapPin,
+  AlertCircle,
   CheckCircle2,
   Loader2,
   Image as ImageIcon,
@@ -24,7 +24,8 @@ import {
   PRIORITY_LABELS,
   LocationData,
   ImageVerificationResult,
-  ImageVerificationSummary
+  ImageVerificationSummary,
+  WaterDepth
 } from "@/types/complaint";
 
 interface NewFileComplaintProps {
@@ -224,7 +225,7 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
   // Convert files to base64
   const convertFilesToBase64 = async (files: File[]): Promise<string[]> => {
     const base64Array: string[] = [];
-    
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const base64 = await new Promise<string>((resolve, reject) => {
@@ -243,7 +244,7 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
       });
       base64Array.push(base64);
     }
-    
+
     return base64Array;
   };
 
@@ -274,7 +275,7 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
   // Form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Mark all fields as touched
     setTouched({
       title: true,
@@ -308,6 +309,7 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
         priority: formData.priority,
         location: formData.location,
         attachments,
+        water_depth: formData.water_depth,
       };
 
       console.log("Filing complaint with payload:", payload);
@@ -361,8 +363,8 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
       } else {
         setError(
           err.response?.data?.detail ||
-            err.message ||
-            "Failed to file complaint. Please try again."
+          err.message ||
+          "Failed to file complaint. Please try again."
         );
       }
     } finally {
@@ -458,14 +460,14 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
                         </span>
                       </div>
                     </div>
-                    
+
                     {verificationSummary.has_critical && (
                       <div className="mt-2 flex items-center gap-2 text-sm text-red-700">
                         <AlertTriangle className="w-4 h-4" />
                         <span>Critical waterlogging detected in images</span>
                       </div>
                     )}
-                    
+
                     <button
                       onClick={() => setShowVerificationDetails(!showVerificationDetails)}
                       className="mt-3 text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
@@ -488,11 +490,10 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
                   {verificationResults.map((result, index) => (
                     <div
                       key={index}
-                      className={`p-3 rounded-lg border ${
-                        result.passed
+                      className={`p-3 rounded-lg border ${result.passed
                           ? "bg-green-50 border-green-200"
                           : "bg-orange-50 border-orange-200"
-                      }`}
+                        }`}
                     >
                       <div className="flex items-start justify-between mb-2">
                         <span className="text-sm font-medium text-gray-900">
@@ -511,18 +512,18 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
                           </span>
                         </div>
                       </div>
-                      
+
                       <p className="text-sm text-gray-700 mb-2">
                         {result.reasoning}
                       </p>
-                      
+
                       {result.detected_issues.length > 0 && (
                         <div className="text-xs text-gray-600">
                           <span className="font-medium">Detected: </span>
                           {result.detected_issues.join(", ")}
                         </div>
                       )}
-                      
+
                       {result.false_positive_reason && (
                         <div className="text-xs text-orange-700 mt-1">
                           <span className="font-medium">Note: </span>
@@ -553,11 +554,10 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
               onChange={(e) => handleFieldChange("title", e.target.value)}
               onBlur={() => handleBlur("title")}
               disabled={loading}
-              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                touched.title && validateField("title", formData.title)
+              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${touched.title && validateField("title", formData.title)
                   ? "border-red-300 bg-red-50"
                   : "border-gray-300"
-              }`}
+                }`}
               placeholder="e.g., Severe waterlogging near XYZ market"
             />
             {touched.title && validateField("title", formData.title) && (
@@ -587,12 +587,11 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
               onBlur={() => handleBlur("description")}
               disabled={loading}
               rows={5}
-              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none ${
-                touched.description &&
-                validateField("description", formData.description)
+              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none ${touched.description &&
+                  validateField("description", formData.description)
                   ? "border-red-300 bg-red-50"
                   : "border-gray-300"
-              }`}
+                }`}
               placeholder="Provide detailed information about the issue, including landmarks, severity, and any immediate dangers..."
             />
             {touched.description &&
@@ -622,12 +621,11 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
                 onChange={(e) => handleFieldChange("category", e.target.value)}
                 onBlur={() => handleBlur("category")}
                 disabled={loading}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                  touched.category &&
-                  validateField("category", formData.category)
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${touched.category &&
+                    validateField("category", formData.category)
                     ? "border-red-300 bg-red-50"
                     : "border-gray-300"
-                }`}
+                  }`}
               >
                 <option value="">Select a category</option>
                 {COMPLAINT_CATEGORIES.map((cat) => (
@@ -663,12 +661,11 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
                 disabled={loading}
                 min="1"
                 max="272"
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                  touched.ward_number &&
-                  validateField("ward_number", formData.ward_number)
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${touched.ward_number &&
+                    validateField("ward_number", formData.ward_number)
                     ? "border-red-300 bg-red-50"
                     : "border-gray-300"
-                }`}
+                  }`}
               />
               {touched.ward_number &&
                 validateField("ward_number", formData.ward_number) && (
@@ -696,16 +693,64 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
                     handleFieldChange("priority", value as ComplaintPriority)
                   }
                   disabled={loading}
-                  className={`px-4 py-3 rounded-lg font-medium border-2 transition-all ${
-                    formData.priority === value
+                  className={`px-4 py-3 rounded-lg font-medium border-2 transition-all ${formData.priority === value
                       ? `${color} border-current`
                       : "bg-white border-gray-300 text-gray-700 hover:border-gray-400"
-                  }`}
+                    }`}
                 >
                   {label}
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Water Depth */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Water Depth (Optional)
+            </label>
+            <p className="text-xs text-gray-500 mb-3">
+              Select the approximate depth of waterlogging for accurate assessment
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              {[
+                { value: WaterDepth.ANKLE_DEEP, label: "🦶 Ankle Deep", desc: "<6 inches" },
+                { value: WaterDepth.KNEE_DEEP, label: "🦵 Knee Deep", desc: "6-18 inches" },
+                { value: WaterDepth.TYRE_DEEP, label: "🚗 Tyre Deep", desc: "18-24 inches" },
+                { value: WaterDepth.HOOD_DEEP, label: "🚙 Hood Deep", desc: "24-36 inches" },
+                { value: WaterDepth.FULLY_SUBMERGED, label: "🌊 Submerged", desc: ">36 inches" },
+              ].map(({ value, label, desc }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => handleFieldChange("water_depth", value)}
+                  disabled={loading}
+                  className={`px-3 py-3 rounded-lg font-medium border-2 transition-all text-sm ${formData.water_depth === value
+                      ? "bg-blue-50 text-blue-700 border-blue-500"
+                      : "bg-white border-gray-300 text-gray-700 hover:border-blue-300 hover:bg-blue-50/30"
+                    }`}
+                >
+                  <div className="text-center">
+                    <div className="mb-1">{label}</div>
+                    <div className="text-xs text-gray-500">{desc}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+            {formData.water_depth && (
+              <div className="mt-2 flex items-center gap-2">
+                <span className="text-xs text-gray-600">Selected:</span>
+                <span className="text-sm font-semibold text-blue-600">{formData.water_depth}</span>
+                <button
+                  type="button"
+                  onClick={() => handleFieldChange("water_depth", null)}
+                  disabled={loading}
+                  className="text-xs text-gray-500 hover:text-gray-700 underline"
+                >
+                  Clear
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Location */}
@@ -775,7 +820,7 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
                 <span>AI-verified</span>
               </div>
             </div>
-            
+
             {/* AI Verification Info Banner */}
             <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
               <div className="flex items-start gap-2">
@@ -793,11 +838,10 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
             <div className="space-y-4">
               <label
                 htmlFor="file-upload"
-                className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
-                  selectedFiles.length >= MAX_FILES
+                className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${selectedFiles.length >= MAX_FILES
                     ? "border-gray-300 bg-gray-50 cursor-not-allowed"
                     : "border-gray-300 bg-gray-50 hover:bg-gray-100"
-                }`}
+                  }`}
               >
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
                   <Camera className="w-10 h-10 text-gray-400 mb-2" />

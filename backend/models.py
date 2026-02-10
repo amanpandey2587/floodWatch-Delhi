@@ -190,6 +190,56 @@ class UserModel:
         return str(user["_id"])
     
     @staticmethod
+    def create_user(email: str, password_hash: str, name: str, role: str = "citizen", ward_number: Optional[int] = None) -> str:
+        """Create new user with email and hashed password"""
+        from passlib.context import CryptContext
+        import uuid
+        
+        # Check if email already exists
+        existing = users_collection.find_one({"email": email})
+        if existing:
+            raise ValueError("Email already registered")
+        
+        user_id = str(uuid.uuid4())
+        user_data = {
+            "user_id": user_id,
+            "email": email,
+            "password_hash": password_hash,
+            "name": name,
+            "role": role,
+            "ward_number": ward_number,
+            "is_verified": False,
+            "is_active": True,
+            "created_at": datetime.now(),
+            "updated_at": datetime.now()
+        }
+        
+        result = users_collection.insert_one(user_data)
+        return user_id
+    
+    @staticmethod
+    def find_by_email(email: str) -> Optional[Dict[str, Any]]:
+        """Find user by email"""
+        user = users_collection.find_one({"email": email})
+        if user:
+            user["_id"] = str(user["_id"])
+        return user
+    
+    @staticmethod
+    def verify_password(plain_password: str, hashed_password: str) -> bool:
+        """Verify password against hash"""
+        from passlib.context import CryptContext
+        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        return pwd_context.verify(plain_password, hashed_password)
+    
+    @staticmethod
+    def hash_password(password: str) -> str:
+        """Hash a password"""
+        from passlib.context import CryptContext
+        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        return pwd_context.hash(password)
+    
+    @staticmethod
     def find_by_id(user_id: str) -> Optional[Dict[str, Any]]:
         """Find user by ID"""
         print(f"[UserModel] Finding user by ID: {user_id}")

@@ -1,15 +1,105 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { MapContainer, TileLayer, GeoJSON, Marker, Popup, Polyline, CircleMarker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import RoutePanel from './RoutePanel';
+import { useSafeParkingAPI } from '@/lib/api';
+
 interface MapData {
   grid: any;
   wards: any;
   drains: any;
   stats: any;
+}
+
+interface ParkingLocation {
+  id: string;
+  name: string;
+  address: string;
+  lat: number;
+  lon: number;
+  type: string;
+  capacity: number;
+  elevation_m: number;
+  ward_number: number;
+  distance_m?: number;
+  distance_km?: number;
+}
+
+interface DraggablePanelProps {
+  title: string;
+  children: React.ReactNode;
+  defaultX?: number;
+  defaultY?: number;
+  className?: string;
+}
+
+// Draggable Panel Component
+function DraggablePanel({ title, children, defaultX = 20, defaultY = 20, className = '' }: DraggablePanelProps) {
+  const [position, setPosition] = useState({ x: defaultX, y: defaultY });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (panelRef.current) {
+      const rect = panelRef.current.getBoundingClientRect();
+      setDragOffset({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      });
+      setIsDragging(true);
+    }
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDragging) {
+        setPosition({
+          x: e.clientX - dragOffset.x,
+          y: e.clientY - dragOffset.y,
+        });
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, dragOffset]);
+
+  return (
+    <div
+      ref={panelRef}
+      className={`absolute bg-white rounded-lg shadow-lg ${isDragging ? 'opacity-90 cursor-grabbing' : ''} ${className}`}
+      style={{
+        left: `${position.x}px`,
+        top: `${position.y}px`,
+        zIndex: isDragging ? 1000 : 500,
+      }}
+    >
+      <div
+        className="bg-gray-800 text-white px-4 py-2 rounded-t-lg cursor-grab active:cursor-grabbing font-semibold text-sm select-none"
+        onMouseDown={handleMouseDown}
+      >
+        {title}
+      </div>
+      <div className="p-4">
+        {children}
+      </div>
+    </div>
+  );
 }
 
 // Color based on risk score
@@ -32,7 +122,6 @@ function MapClickHandler({ onMapClick }: { onMapClick: (lat: number, lon: number
 // Style function for grid cells
 const gridStyle = (feature: any) => {
   const riskScore = feature.properties.risk_score || 0;
-  
   return {
     fillColor: getRiskColor(riskScore),
     fillOpacity: 0.7,
@@ -52,13 +141,22 @@ const wardStyle = {
 };
 
 export default function WaterloggingMap() {
+  const safeParkingAPI = useSafeParkingAPI();
   const [mapData, setMapData] = useState<MapData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filterRisk, setFilterRisk] = useState<number>(0);
+  const [filterRisk, setFilterRisk] = useState(0);
   const [routeData, setRouteData] = useState<any>(null);
   const [clickMode, setClickMode] = useState<'start' | 'end' | null>(null);
-const handleRouteCalculated = (data: any) => {
+  const [parkingLat, setParkingLat] = useState('');
+  const [parkingLon, setParkingLon] = useState('');
+  const [parkingRadius, setParkingRadius] = useState('2000');
+  const [parkingLimit, setParkingLimit] = useState('3');
+  const [parkingLoading, setParkingLoading] = useState(false);
+  const [parkingError, setParkingError] = useState<string | null>(null);
+  const [parkingLocations, setParkingLocations] = useState<ParkingLocation[]>([]);
+
+  const handleRouteCalculated = (data: any) => {
     setRouteData(data);
   };
 
@@ -69,18 +167,86 @@ const handleRouteCalculated = (data: any) => {
   const handleMapClick = (lat: number, lon: number) => {
     if (clickMode === 'start') {
       console.log('Start point set:', lat, lon);
-      // You can update RoutePanel state here
     } else if (clickMode === 'end') {
       console.log('End point set:', lat, lon);
-      // You can update RoutePanel state here
     }
   };
+
+  const parseNumber = (value: string) => {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+  };
+
+  const fetchNearbyParking = async (latValue?: number, lonValue?: number) => {
+    const latNum = latValue ?? parseNumber(parkingLat);
+    const lonNum = lonValue ?? parseNumber(parkingLon);
+
+    if (latNum === null || lonNum === null) {
+      setParkingError('Enter valid latitude and longitude.');
+      return;
+    }
+
+    setParkingLoading(true);
+    setParkingError(null);
+
+    try {
+      const data = await safeParkingAPI.getNearby({
+        lat: latNum,
+        lon: lonNum,
+        radius: parseNumber(parkingRadius) ?? 2000,
+        limit: parseNumber(parkingLimit) ?? 3,
+      });
+      setParkingLocations(data.locations || []);
+    } catch (err: any) {
+      setParkingError(err?.message || 'Failed to load safe parking.');
+    } finally {
+      setParkingLoading(false);
+    }
+  };
+
+  const fetchAllParking = async () => {
+    setParkingLoading(true);
+    setParkingError(null);
+
+    try {
+      const data = await safeParkingAPI.getAll();
+      setParkingLocations(data.locations || []);
+    } catch (err: any) {
+      setParkingError(err?.message || 'Failed to load safe parking.');
+    } finally {
+      setParkingLoading(false);
+    }
+  };
+
+  const useMyLocation = () => {
+    if (!navigator.geolocation) {
+      setParkingError('Geolocation is not supported in this browser.');
+      return;
+    }
+
+    setParkingLoading(true);
+    setParkingError(null);
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const latVal = Number(pos.coords.latitude.toFixed(6));
+        const lonVal = Number(pos.coords.longitude.toFixed(6));
+        setParkingLat(String(latVal));
+        setParkingLon(String(lonVal));
+        fetchNearbyParking(latVal, lonVal);
+      },
+      () => {
+        setParkingLoading(false);
+        setParkingError('Location permission denied.');
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        
-        // Fetch all data in parallel
         const [gridRes, wardsRes, drainsRes, statsRes] = await Promise.all([
           fetch(`http://localhost:8000/api/grid?risk_min=${filterRisk}`),
           fetch('http://localhost:8000/api/wards'),
@@ -107,80 +273,52 @@ const handleRouteCalculated = (data: any) => {
     fetchData();
   }, [filterRisk]);
 
-  // Popup content for grid cells
   const onEachGridFeature = (feature: any, layer: L.Layer) => {
     if (feature.properties) {
       const props = feature.properties;
-      
       const popupContent = `
-        <div style="font-family: Arial; padding: 8px;">
-          <h3 style="margin: 0 0 8px 0; color: #2c3e50;">Cell #${props.cell_id || 'N/A'}</h3>
-          <table style="width: 100%; font-size: 12px;">
-            <tr>
-              <td><strong>Risk:</strong></td>
-              <td><span style="color: ${getRiskColor(props.risk_score)}; font-weight: bold;">
-                ${props.risk_category || 'Unknown'}
-              </span></td>
-            </tr>
-            <tr>
-              <td><strong>Score:</strong></td>
-              <td>${props.risk_score?.toFixed(3) || 'N/A'}</td>
-            </tr>
-            <tr>
-              <td><strong>Elevation:</strong></td>
-              <td>${props.elevation_m?.toFixed(1) || 'N/A'} m</td>
-            </tr>
-            <tr>
-              <td><strong>Rainfall:</strong></td>
-              <td>${props.rainfall_24h_mm?.toFixed(1) || 'N/A'} mm</td>
-            </tr>
-            <tr>
-              <td><strong>Drain Dist:</strong></td>
-              <td>${props.drain_distance_m?.toFixed(0) || 'N/A'} m</td>
-            </tr>
-          </table>
+        <div class="text-xs">
+          <strong>Cell #${props.cell_id || 'N/A'}</strong><br/>
+          Risk: ${props.risk_category || 'Unknown'}<br/>
+          Score: ${props.risk_score?.toFixed(3) || 'N/A'}<br/>
+          Elevation: ${props.elevation_m?.toFixed(1) || 'N/A'} m<br/>
+          Rainfall: ${props.rainfall_24h_mm?.toFixed(1) || 'N/A'} mm<br/>
+          Drain Dist: ${props.drain_distance_m?.toFixed(0) || 'N/A'} m
         </div>
       `;
-      
       layer.bindPopup(popupContent);
     }
   };
 
-  // Popup for wards
   const onEachWardFeature = (feature: any, layer: L.Layer) => {
     if (feature.properties) {
       const props = feature.properties;
-      
       const popupContent = `
-        <div style="font-family: Arial; padding: 8px;">
-          <h3 style="margin: 0 0 8px 0;">${props.ward_name || 'Unknown Ward'}</h3>
-          <p><strong>Avg Risk:</strong> ${props.avg_risk?.toFixed(3) || 'N/A'}</p>
-          <p><strong>High-risk Cells:</strong> ${props.high_risk_cells || 0}</p>
-          <p><strong>Total Cells:</strong> ${props.n_cells || 0}</p>
+        <div class="text-xs">
+          <strong>${props.ward_name || 'Unknown Ward'}</strong><br/>
+          Avg Risk: ${props.avg_risk?.toFixed(3) || 'N/A'}<br/>
+          High-risk Cells: ${props.high_risk_cells || 0}<br/>
+          Total Cells: ${props.n_cells || 0}
         </div>
       `;
-      
       layer.bindPopup(popupContent);
     }
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading map data...</p>
-        </div>
+      <div className="flex items-center justify-center h-screen bg-gray-100">
+        <div className="text-xl font-semibold">Loading map data...</div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center text-red-500">
-          <p className="text-xl font-bold mb-2">Error</p>
-          <p>{error}</p>
+      <div className="flex items-center justify-center h-screen bg-gray-100">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-red-600">Error</h2>
+          <p className="text-gray-700 mt-2">{error}</p>
         </div>
       </div>
     );
@@ -189,78 +327,134 @@ const handleRouteCalculated = (data: any) => {
   return (
     <div className="relative h-screen w-full">
       {/* Stats Panel */}
-      <RoutePanel
-              onRouteCalculated={handleRouteCalculated}
-              onClearRoute={handleClearRoute}
-            />
       {mapData?.stats && (
-        <div className="absolute top-4 left-4 z-[1000] bg-white p-4 rounded-lg shadow-lg">
-          <h2 className="text-lg font-bold mb-2">East Delhi Risk Stats</h2>
-          <div className="text-sm space-y-1">
-            <p><strong>Total Cells:</strong> {mapData.stats.total_cells}</p>
-            <p><strong>Avg Risk:</strong> {mapData.stats.avg_risk.toFixed(3)}</p>
-            <p><strong>High Risk:</strong> {mapData.stats.high_risk_count}</p>
-            <p><strong>Critical:</strong> {mapData.stats.critical_count}</p>
+        <DraggablePanel title="📊 East Delhi Risk Stats" defaultX={20} defaultY={20} className="w-64">
+          <div className="space-y-2 text-sm">
+            <div><strong>Total Cells:</strong> {mapData.stats.total_cells}</div>
+            <div><strong>Avg Risk:</strong> {mapData.stats.avg_risk.toFixed(3)}</div>
+            <div><strong>High Risk:</strong> {mapData.stats.high_risk_count}</div>
+            <div><strong>Critical:</strong> {mapData.stats.critical_count}</div>
+            <div className="mt-3">
+              <strong>Distribution:</strong>
+              {Object.entries(mapData.stats.risk_distribution).map(([category, count]: [string, any]) => (
+                <div key={category} className="ml-2">
+                  {category}: {count}
+                </div>
+              ))}
+            </div>
           </div>
-          
-          <div className="mt-4">
-            <h3 className="font-bold text-sm mb-2">Distribution:</h3>
-            {Object.entries(mapData.stats.risk_distribution).map(([category, count]: [string, any]) => (
-              <div key={category} className="flex justify-between text-xs">
-                <span>{category}:</span>
-                <span className="font-bold">{count}</span>
+        </DraggablePanel>
+      )}
+
+      {/* Safe Parking Panel */}
+      <DraggablePanel title="🅿️ Safe Parking Nearby" defaultX={20} defaultY={320} className="w-80 max-h-[calc(100vh-340px)] overflow-hidden">
+        <div className="space-y-3 max-h-[calc(100vh-420px)] overflow-y-auto">
+          <div className="flex gap-2">
+            <button
+              onClick={useMyLocation}
+              className="flex-1 px-3 py-1.5 rounded bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700"
+              disabled={parkingLoading}
+            >
+              📍 Use My Location
+            </button>
+            <button
+              onClick={fetchAllParking}
+              className="flex-1 px-3 py-1.5 rounded bg-green-600 text-white text-xs font-semibold hover:bg-green-700"
+              disabled={parkingLoading}
+            >
+              Show All
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="number"
+              placeholder="Latitude"
+              className="px-2 py-1 border rounded text-xs"
+              value={parkingLat}
+              onChange={(e) => setParkingLat(e.target.value)}
+            />
+            <input
+              type="number"
+              placeholder="Longitude"
+              className="px-2 py-1 border rounded text-xs"
+              value={parkingLon}
+              onChange={(e) => setParkingLon(e.target.value)}
+            />
+            <input
+              type="number"
+              placeholder="Radius (m)"
+              className="px-2 py-1 border rounded text-xs"
+              value={parkingRadius}
+              onChange={(e) => setParkingRadius(e.target.value)}
+            />
+            <input
+              type="number"
+              placeholder="Limit"
+              className="px-2 py-1 border rounded text-xs"
+              value={parkingLimit}
+              onChange={(e) => setParkingLimit(e.target.value)}
+            />
+          </div>
+
+          <button
+            onClick={() => fetchNearbyParking()}
+            className="w-full px-3 py-1.5 rounded bg-black text-white text-xs font-semibold hover:bg-gray-800"
+            disabled={parkingLoading}
+          >
+            {parkingLoading ? 'Searching...' : 'Find Parking'}
+          </button>
+
+          {parkingError && (
+            <div className="text-red-600 text-xs">{parkingError}</div>
+          )}
+
+          <div className="space-y-2">
+            {parkingLocations.length === 0 && !parkingLoading && !parkingError && (
+              <div className="text-gray-500 text-xs text-center py-4">
+                No locations found.
+              </div>
+            )}
+            {parkingLocations.map((loc) => (
+              <div key={loc.id} className="p-2 border rounded text-xs bg-gray-50 hover:bg-gray-100">
+                <div className="font-semibold">{loc.name}</div>
+                <div className="text-gray-600">{loc.address}</div>
+                <div className="text-gray-500 text-xs mt-1">
+                  Ward {loc.ward_number} • {loc.distance_km ?? 'n/a'} km • Elev {loc.elevation_m} m
+                </div>
               </div>
             ))}
           </div>
         </div>
-      )}
+      </DraggablePanel>
 
-      {/* Filter Controls */}
-      {/* <div className="absolute top-4 right-4 z-[1000] bg-white p-4 rounded-lg shadow-lg">
-        <h3 className="font-bold mb-2">Filter by Risk</h3>
-        <div className="space-y-2">
-          <button
-            onClick={() => setFilterRisk(0)}
-            className={`w-full px-3 py-1 rounded ${filterRisk === 0 ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
-          >
-            All
-          </button>
-          <button
-            onClick={() => setFilterRisk(0.3)}
-            className={`w-full px-3 py-1 rounded ${filterRisk === 0.3 ? 'bg-yellow-500 text-white' : 'bg-gray-200'}`}
-          >
-            Medium+
-          </button>
-          <button
-            onClick={() => setFilterRisk(0.5)}
-            className={`w-full px-3 py-1 rounded ${filterRisk === 0.5 ? 'bg-orange-500 text-white' : 'bg-gray-200'}`}
-          >
-            High+
-          </button>
-          <button
-            onClick={() => setFilterRisk(0.7)}
-            className={`w-full px-3 py-1 rounded ${filterRisk === 0.7 ? 'bg-red-500 text-white' : 'bg-gray-200'}`}
-          >
-            Critical
-          </button>
+      {/* Route Planning Panel - Now Draggable! */}
+      <DraggablePanel 
+        title="🗺️ Route Planning" 
+        defaultX={typeof window !== 'undefined' ? window.innerWidth - 360 : 300} 
+        defaultY={20} 
+        className="w-80 max-h-[calc(100vh-40px)] overflow-hidden"
+      >
+        <div className="max-h-[calc(100vh-120px)] overflow-y-auto">
+          <RoutePanelContent 
+            onRouteCalculated={handleRouteCalculated}
+            onClearRoute={handleClearRoute}
+          />
         </div>
-      </div> */}
-
+      </DraggablePanel>
 
       {/* Map */}
       <MapContainer
-        center={[28.65, 77.28]}
-        zoom={13}
-        className="h-full w-full"
-        zoomControl={true}
+        center={[28.67, 77.30]}
+        zoom={12}
+        style={{ height: '100%', width: '100%' }}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         />
-                <MapClickHandler onMapClick={handleMapClick} />
+        <MapClickHandler onMapClick={handleMapClick} />
 
-        {/* Grid Layer */}
         {mapData?.grid && (
           <GeoJSON
             data={mapData.grid}
@@ -269,136 +463,318 @@ const handleRouteCalculated = (data: any) => {
           />
         )}
 
-        {/* Ward Boundaries */}
-        {/* {mapData?.wards && (
+        {routeData && (
+          <>
+            <Polyline
+              positions={routeData.route.geometry.coordinates.map(([lon, lat]: [number, number]) => [lat, lon])}
+              pathOptions={{
+                color: routeData.risk_analysis.color,
+                weight: 6,
+                opacity: 0.8
+              }}
+            >
+              <Popup>
+                <div className="text-xs">
+                  <strong>Route Details</strong><br/>
+                  Distance: {routeData.route.properties.distance_km.toFixed(2)} km<br/>
+                  Duration: {routeData.route.properties.duration_min.toFixed(0)} min<br/>
+                  Risk: {routeData.risk_analysis.risk_level}
+                </div>
+              </Popup>
+            </Polyline>
+
+            <Marker position={[routeData.waypoints.start.lat, routeData.waypoints.start.lon]}>
+              <Popup>
+                <div className="text-xs">
+                  <strong>START</strong><br/>
+                  Lat: {routeData.waypoints.start.lat.toFixed(4)}<br/>
+                  Lon: {routeData.waypoints.start.lon.toFixed(4)}
+                </div>
+              </Popup>
+            </Marker>
+
+            <Marker position={[routeData.waypoints.end.lat, routeData.waypoints.end.lon]}>
+              <Popup>
+                <div className="text-xs">
+                  <strong>END</strong><br/>
+                  Lat: {routeData.waypoints.end.lat.toFixed(4)}<br/>
+                  Lon: {routeData.waypoints.end.lon.toFixed(4)}
+                </div>
+              </Popup>
+            </Marker>
+
+            {routeData.risk_analysis.high_risk_segments.map((segment: any, idx: number) => (
+              <CircleMarker
+                key={idx}
+                center={[segment.centroid.lat, segment.centroid.lon]}
+                radius={8}
+                pathOptions={{ color: 'red', fillColor: 'red', fillOpacity: 0.7 }}
+              >
+                <Popup>
+                  <div className="text-xs">
+                    <strong>⚠️ Warning #{idx + 1}</strong><br/>
+                    Risk: {segment.category}<br/>
+                    Score: {segment.risk.toFixed(3)}<br/>
+                    Drive carefully in this area
+                  </div>
+                </Popup>
+              </CircleMarker>
+            ))}
+          </>
+        )}
+
+        {mapData?.drains && mapData.drains.features?.length > 0 && (
           <GeoJSON
-            data={mapData.wards}
-            style={wardStyle}
-            onEachFeature={onEachWardFeature}
+            data={mapData.drains}
+            style={{ color: 'blue', weight: 2, opacity: 0.6 }}
           />
-        )} */}
-              <div className="absolute top-15 right-4 z-[1000] bg-white p-4 rounded-lg shadow-lg">
-        <h3 className="font-bold mb-2">Filter by Risk</h3>
-        <div className="space-y-2">
+        )}
+      </MapContainer>
+
+      {/* Filter Panel */}
+      <DraggablePanel 
+        title="🔍 Filter by Risk" 
+        defaultX={typeof window !== 'undefined' ? window.innerWidth / 2 - 140 : 300} 
+        defaultY={20} 
+        className="w-72"
+      >
+        <div className="grid grid-cols-2 gap-2">
           <button
             onClick={() => setFilterRisk(0)}
-            className={`w-full px-3 py-1 rounded ${filterRisk === 0 ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+            className={`px-3 py-2 rounded text-sm font-semibold ${
+              filterRisk === 0 ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
+            }`}
           >
             All
           </button>
           <button
             onClick={() => setFilterRisk(0.3)}
-            className={`w-full px-3 py-1 rounded ${filterRisk === 0.3 ? 'bg-yellow-500 text-white' : 'bg-gray-200'}`}
+            className={`px-3 py-2 rounded text-sm font-semibold ${
+              filterRisk === 0.3 ? 'bg-yellow-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
+            }`}
           >
             Medium+
           </button>
           <button
             onClick={() => setFilterRisk(0.5)}
-            className={`w-full px-3 py-1 rounded ${filterRisk === 0.5 ? 'bg-orange-500 text-white' : 'bg-gray-200'}`}
+            className={`px-3 py-2 rounded text-sm font-semibold ${
+              filterRisk === 0.5 ? 'bg-orange-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
+            }`}
           >
             High+
           </button>
           <button
             onClick={() => setFilterRisk(0.7)}
-            className={`w-full px-3 py-1 rounded ${filterRisk === 0.7 ? 'bg-red-500 text-white' : 'bg-gray-200'}`}
+            className={`px-3 py-2 rounded text-sm font-semibold ${
+              filterRisk === 0.7 ? 'bg-red-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
+            }`}
           >
             Critical
           </button>
         </div>
+      </DraggablePanel>
+    </div>
+  );
+}
+
+// Extract RoutePanel content as a separate component
+function RoutePanelContent({ onRouteCalculated, onClearRoute }: { onRouteCalculated: (data: any) => void; onClearRoute: () => void }) {
+  const [startQuery, setStartQuery] = useState('Connaught Place');
+  const [endQuery, setEndQuery] = useState('India Gate');
+  const [profile, setProfile] = useState('driving');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [routeInfo, setRouteInfo] = useState<any>(null);
+
+  const resolveLocation = async (query: string) => {
+    try {
+      const res = await fetch(`http://localhost:8000/api/geocode?query=${encodeURIComponent(query)}`);
+      if (!res.ok) throw new Error('Geocoding failed');
+      const data = await res.json();
+      if (data.length === 0) throw new Error(`Location not found: ${query}`);
+      return data[0];
+    } catch (err) {
+      console.error(err);
+      return null;
+    }
+  };
+
+  const handleCalculateRoute = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const startLoc = await resolveLocation(startQuery);
+      const endLoc = await resolveLocation(endQuery);
+
+      if (!startLoc) throw new Error(`Could not find start location: "${startQuery}"`);
+      if (!endLoc) throw new Error(`Could not find end location: "${endQuery}"`);
+
+      const response = await fetch(
+        `http://localhost:8000/api/route?` +
+        `start_lat=${startLoc.lat}&start_lon=${startLoc.lon}&` +
+        `end_lat=${endLoc.lat}&end_lon=${endLoc.lon}&` +
+        `profile=${profile}`
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to calculate route');
+      }
+
+      const data = await response.json();
+      setRouteInfo(data);
+      onRouteCalculated(data);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClear = () => {
+    setRouteInfo(null);
+    onClearRoute();
+  };
+
+  const presetLocations = [
+    { name: 'Preet Vihar' },
+    { name: 'Mayur Vihar' },
+    { name: 'Laxmi Nagar' },
+    { name: 'Gandhi Nagar' },
+  ];
+
+  return (
+    <div>
+      {/* Quick Presets */}
+      <div className="mb-4">
+        <label className="block text-sm font-bold mb-2">Quick Locations:</label>
+        <div className="flex flex-wrap gap-2">
+          {presetLocations.map((loc, idx) => (
+            <button
+              key={idx}
+              onClick={() => setStartQuery(loc.name)}
+              className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded hover:bg-blue-200"
+            >
+              {loc.name}
+            </button>
+          ))}
+        </div>
       </div>
-        {routeData && (
-                  <>
-                    {/* Route Line */}
-                    <Polyline
-                      positions={routeData.route.geometry.coordinates.map(
-                        ([lon, lat]: [number, number]) => [lat, lon]
-                      )}
-                      pathOptions={{
-                        color: routeData.risk_analysis.color,
-                        weight: 6,
-                        opacity: 0.8
-                      }}
-                    >
-                      <Popup>
-                        <div className="p-2">
-                          <h3 className="font-bold mb-2">Route Details</h3>
-                          <p><strong>Distance:</strong> {routeData.route.properties.distance_km.toFixed(2)} km</p>
-                          <p><strong>Duration:</strong> {routeData.route.properties.duration_min.toFixed(0)} min</p>
-                          <p><strong>Risk:</strong> {routeData.risk_analysis.risk_level}</p>
-                        </div>
-                      </Popup>
-                    </Polyline>
-        
-                    {/* Start Marker */}
-                    <Marker
-                      position={[routeData.waypoints.start.lat, routeData.waypoints.start.lon]}
-                      icon={L.icon({
-                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-                        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-                        iconSize: [25, 41],
-                        iconAnchor: [12, 41],
-                        popupAnchor: [1, -34],
-                        shadowSize: [41, 41]
-                      })}
-                    >
-                      <Popup>
-                        <strong>START</strong>
-                        <p>Lat: {routeData.waypoints.start.lat.toFixed(4)}</p>
-                        <p>Lon: {routeData.waypoints.start.lon.toFixed(4)}</p>
-                      </Popup>
-                    </Marker>
-        
-                    {/* End Marker */}
-                    <Marker
-                      position={[routeData.waypoints.end.lat, routeData.waypoints.end.lon]}
-                      icon={L.icon({
-                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-                        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-                        iconSize: [25, 41],
-                        iconAnchor: [12, 41],
-                        popupAnchor: [1, -34],
-                        shadowSize: [41, 41]
-                      })}
-                    >
-                      <Popup>
-                        <strong>END</strong>
-                        <p>Lat: {routeData.waypoints.end.lat.toFixed(4)}</p>
-                        <p>Lon: {routeData.waypoints.end.lon.toFixed(4)}</p>
-                      </Popup>
-                    </Marker>
-        
-                    {/* High-Risk Segment Markers */}
-                    {routeData.risk_analysis.high_risk_segments.map((segment: any, idx: number) => (
-                      <CircleMarker
-                        key={idx}
-                        center={[segment.lat, segment.lon]}
-                        radius={8}
-                        pathOptions={{
-                          color: '#c0392b',
-                          fillColor: '#e74c3c',
-                          fillOpacity: 0.8
-                        }}
-                      >
-                        <Popup>
-                          <div>
-                            <h4 className="font-bold text-red-600">⚠️ Warning #{idx + 1}</h4>
-                            <p><strong>Risk:</strong> {segment.category}</p>
-                            <p><strong>Score:</strong> {segment.risk.toFixed(3)}</p>
-                            <p className="text-sm text-gray-600 mt-1">Drive carefully in this area</p>
-                          </div>
-                        </Popup>
-                      </CircleMarker>
-                    ))}
-                  </>
-                )}
-        {/* Drainage Network */}
-        {mapData?.drains && mapData.drains.features?.length > 0 && (
-          <GeoJSON
-            data={mapData.drains}
-            style={{ color: '#3498db', weight: 2, opacity: 0.6 }}
-          />
+
+      {/* Start Point */}
+      <div className="mb-4">
+        <label className="block text-sm font-bold mb-2">📍 Start Point</label>
+        <input
+          type="text"
+          placeholder="Enter start location (e.g. CP)"
+          value={startQuery}
+          onChange={(e) => setStartQuery(e.target.value)}
+          className="w-full p-2 border rounded text-sm"
+        />
+      </div>
+
+      {/* End Point */}
+      <div className="mb-4">
+        <label className="block text-sm font-bold mb-2">🎯 End Point</label>
+        <input
+          type="text"
+          placeholder="Enter destination"
+          value={endQuery}
+          onChange={(e) => setEndQuery(e.target.value)}
+          className="w-full p-2 border rounded text-sm"
+        />
+      </div>
+
+      {/* Travel Mode */}
+      <div className="mb-4">
+        <label className="block text-sm font-bold mb-2">🚗 Travel Mode</label>
+        <select
+          value={profile}
+          onChange={(e) => setProfile(e.target.value)}
+          className="w-full p-2 border rounded"
+        >
+          <option value="driving">🚗 Driving</option>
+          <option value="walking">🚶 Walking</option>
+          <option value="cycling">🚴 Cycling</option>
+        </select>
+      </div>
+
+      {/* Buttons */}
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={handleCalculateRoute}
+          disabled={loading}
+          className="flex-1 bg-blue-500 text-white p-2 rounded hover:bg-blue-600 disabled:bg-gray-400"
+        >
+          {loading ? '⏳ Calculating...' : '🔍 Find Route'}
+        </button>
+        {routeInfo && (
+          <button
+            onClick={handleClear}
+            className="bg-red-500 text-white p-2 rounded hover:bg-red-600"
+          >
+            ❌ Clear
+          </button>
         )}
-      </MapContainer>
+      </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-3 py-2 rounded mb-4 text-sm">
+          {error}
+        </div>
+      )}
+
+      {/* Route Info */}
+      {routeInfo && (
+        <div className="border-t pt-4">
+          <h3 className="font-bold mb-2">📊 Route Summary</h3>
+
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span>Distance:</span>
+              <span className="font-bold">
+                {routeInfo.route.properties.distance_km.toFixed(2)} km
+              </span>
+            </div>
+
+            <div className="flex justify-between">
+              <span>Duration:</span>
+              <span className="font-bold">
+                {routeInfo.route.properties.duration_min.toFixed(0)} min
+              </span>
+            </div>
+
+            <div className="flex justify-between items-center">
+              <span>Risk Level:</span>
+              <span
+                className="font-bold px-2 py-1 rounded text-white text-xs"
+                style={{ backgroundColor: routeInfo.risk_analysis.color }}
+              >
+                {routeInfo.risk_analysis.risk_level}
+              </span>
+            </div>
+
+            <div className="flex justify-between">
+              <span>Avg Risk Score:</span>
+              <span className="font-bold">
+                {routeInfo.risk_analysis.avg_risk.toFixed(3)}
+              </span>
+            </div>
+
+            {routeInfo.risk_analysis.warning_count > 0 && (
+              <div className="bg-yellow-100 border border-yellow-400 text-yellow-800 px-3 py-2 rounded mt-2">
+                ⚠️ {routeInfo.risk_analysis.warning_count} high-risk segment(s) detected!
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Instructions */}
+      <div className="mt-4 text-xs text-gray-500 border-t pt-2">
+        💡 Tip: Enter location names to find the safest route.
+      </div>
     </div>
   );
 }

@@ -14,14 +14,19 @@ fcm_credentials = None
 
 if FCM_SERVICE_ACCOUNT_PATH and os.path.exists(FCM_SERVICE_ACCOUNT_PATH):
     try:
-        fcm_credentials = service_account.Credentials.from_service_account_file(
-            FCM_SERVICE_ACCOUNT_PATH,
-            scopes=['https://www.googleapis.com/auth/firebase.messaging']
-        )
-        fcm_credentials.refresh(Request())
-        print(f"[Notifications] FCM credentials loaded")
+        # Check if file is empty
+        if os.path.getsize(FCM_SERVICE_ACCOUNT_PATH) > 0:
+            fcm_credentials = service_account.Credentials.from_service_account_file(
+                FCM_SERVICE_ACCOUNT_PATH,
+                scopes=['https://www.googleapis.com/auth/firebase.messaging']
+            )
+            fcm_credentials.refresh(Request())
+            print(f"[Notifications] FCM credentials loaded")
+        else:
+             print(f"[Notifications] FCM service account file is empty. Push notifications disabled.")
+             fcm_credentials = None
     except Exception as e:
-        print(f"[Notifications] Error initializing FCM: {e}")
+        print(f"[Notifications] Error initializing FCM: {e}. Push notifications disabled.")
         fcm_credentials = None
 else:
     print(f"[Notifications] FCM_SERVICE_ACCOUNT_PATH not set. Push notifications disabled.")

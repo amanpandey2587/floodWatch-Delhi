@@ -13,6 +13,14 @@ export enum ComplaintPriority {
   URGENT = "urgent"
 }
 
+export enum WaterDepth {
+  ANKLE_DEEP = "Ankle Deep",
+  KNEE_DEEP = "Knee Deep",
+  TYRE_DEEP = "Tyre Deep",
+  HOOD_DEEP = "Hood Deep",
+  FULLY_SUBMERGED = "Fully Submerged"
+}
+
 export interface LocationData {
   latitude: number;
   longitude: number;
@@ -26,6 +34,7 @@ export interface ComplaintFormData {
   priority: ComplaintPriority;
   location: LocationData | null;
   attachments: string[];
+  water_depth?: WaterDepth | null;
 }
 
 export interface Complaint {
@@ -123,7 +132,15 @@ export interface Complaint {
   assigned_officer_id: string | null;
   location: LocationData | null;
   attachments: string[];
-  image_verification?: ImageVerification;  // ADD THIS LINE
+  image_verification?: ImageVerification;
+  water_depth?: string | null;
+  sla_info?: {
+    elapsed_hours: number;
+    remaining_hours: number;
+    sla_status: string;
+    sla_percentage: number;
+    target_hours: number;
+  };
   timeline: TimelineEntry[];
   response_time_hours: number | null;
   resolution: string | null;

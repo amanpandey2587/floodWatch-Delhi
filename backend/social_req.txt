@@ -1,0 +1,43 @@
+# Social Media Scraping & NLP Requirements
+
+# Core scraping libraries
+ntscraper==0.3.0          # Twitter scraping without API
+telethon==1.28.5          # Telegram scraping
+tweepy==4.14.0            # Alternative Twitter API (if you have API keys)
+
+# NLP libraries
+spacy==3.7.2              # Advanced NLP
+textblob==0.17.1          # Sentiment analysis
+nltk==3.8.1               # Natural language toolkit
+
+# Hindi language support
+indic-nlp-library==0.92   # Hindi NLP
+python-twitter==3.5       # Alternative Twitter library
+
+# Data processing
+pandas==2.1.4
+numpy==1.26.2
+
+# Async support
+asyncio==3.4.3
+aiohttp==3.9.1
+
+# API integration
+fastapi==0.109.0
+uvicorn==0.25.0
+pydantic==2.5.3
+
+# Utilities
+python-dotenv==1.0.0
+requests==2.31.0
+beautifulsoup4==4.12.2    # For additional web scraping
+
+# Database (if needed)
+sqlalchemy==2.0.25
+aiosqlite==0.19.0
+
+# Scheduling (for automated monitoring)
+apscheduler==3.10.4
+
+# Logging
+loguru==0.7.2

@@ -56,17 +56,28 @@ def file_complaint(complaint_data: ComplaintCreate, user_id: str) -> dict:
         "assigned_officer_id": None,
         "location": location_dict,
         "attachments": complaint_data.attachments or [],
+        "water_depth": complaint_data.water_depth.value if complaint_data.water_depth else None,
         "image_verification": {  # ADD THIS FIELD
             "results": verification_results,
             "summary": verification_summary,
             "verified_at": now.isoformat() if verification_results else None
         },
+        # SLA Tracking
+        "sla_target_hours": 24,
+        "reported_at": now,
+        "acknowledged_at": None,
+        "in_progress_at": None,
+        "resolved_at": None,
+        "sla_status": "within_sla",
         "timeline": [{
             "timestamp": now,
             "status": ComplaintStatus.PENDING.value,
             "remarks": "Complaint filed" + (
                 f" - {verification_summary['verified_count']}/{verification_summary['total_images']} images verified"
                 if verification_summary else ""
+            ) + (
+                f" - Water Depth: {complaint_data.water_depth.value}"
+                if complaint_data.water_depth else ""
             ),
             "updated_by": user_id
         }],
@@ -106,11 +117,24 @@ def get_complaint_by_id(complaint_id: str) -> Optional[dict]:
             complaint["created_at"] = complaint["created_at"].isoformat()
         if "updated_at" in complaint and isinstance(complaint["updated_at"], datetime):
             complaint["updated_at"] = complaint["updated_at"].isoformat()
+        if "reported_at" in complaint and isinstance(complaint["reported_at"], datetime):
+            complaint["reported_at"] = complaint["reported_at"].isoformat()
+        if "acknowledged_at" in complaint and isinstance(complaint["acknowledged_at"], datetime):
+            complaint["acknowledged_at"] = complaint["acknowledged_at"].isoformat() if complaint["acknowledged_at"] else None
+        if "in_progress_at" in complaint and isinstance(complaint["in_progress_at"], datetime):
+            complaint["in_progress_at"] = complaint["in_progress_at"].isoformat() if complaint["in_progress_at"] else None
+        if "resolved_at" in complaint and isinstance(complaint["resolved_at"], datetime):
+            complaint["resolved_at"] = complaint["resolved_at"].isoformat() if complaint["resolved_at"] else None
         # Convert timeline datetimes
         if "timeline" in complaint:
             for entry in complaint["timeline"]:
                 if "timestamp" in entry and isinstance(entry["timestamp"], datetime):
                     entry["timestamp"] = entry["timestamp"].isoformat()
+        
+        # Add calculated SLA info
+        from sla_helper import calculate_sla_status
+        sla_info = calculate_sla_status(complaint)
+        complaint["sla_info"] = sla_info
     return complaint
 
 def get_complaints_by_user(user_id: str) -> List[dict]:
@@ -180,7 +204,23 @@ def update_complaint_status(complaint_id: str, status: ComplaintStatus, remarks:
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Complaint not found")
     
-    ComplaintModel.update(complaint_id, {"status": status.value})
+    update_data = {"status": status.value}
+    now = datetime.now()
+    
+    # Update SLA timestamps based on status
+    if status == ComplaintStatus.ACKNOWLEDGED and not complaint.get("acknowledged_at"):
+        update_data["acknowledged_at"] = now
+    elif status == ComplaintStatus.IN_PROGRESS and not complaint.get("in_progress_at"):
+        update_data["in_progress_at"] = now
+    elif status == ComplaintStatus.RESOLVED and not complaint.get("resolved_at"):
+        update_data["resolved_at"] = now
+        
+        # Calculate SLA status
+        from sla_helper import calculate_sla_status
+        sla_info = calculate_sla_status(complaint)
+        update_data["sla_status"] = sla_info["sla_status"]
+    
+    ComplaintModel.update(complaint_id, update_data)
     ComplaintModel.add_timeline_entry(complaint_id, {
         "status": status.value,
         "remarks": remarks,
