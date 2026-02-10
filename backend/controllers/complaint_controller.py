@@ -4,7 +4,7 @@ from complaints_db import (
     file_complaint, assign_complaint, update_complaint_status,
     add_timeline_entry, resolve_complaint, rate_complaint,
     get_complaints_by_user, get_complaints_by_ward, track_complaint,
-    get_all_complaints
+    get_all_complaints, set_complaint_eta
 )
 
 class ComplaintController:
@@ -21,8 +21,11 @@ class ComplaintController:
     @staticmethod
     def list_complaints(user_id: str, role: str, ward_number: int, status: str):
         try:
-            if role == "ward_admin" and ward_number:
+            role_norm = str(role or "").strip().lower()
+            if role_norm in ["ward_admin", "ward_officer", "admin"] and ward_number:
                 complaints = get_complaints_by_ward(ward_number)
+            elif role_norm in ["ward_admin", "ward_officer", "admin"]:
+                complaints = get_all_complaints(ward_number=ward_number, status=status)
             elif user_id:
                 complaints = get_complaints_by_user(user_id)
             else:
@@ -106,6 +109,20 @@ class ComplaintController:
                 rating_data.feedback,
                 user_id
             )
+            return result
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    @staticmethod
+    def set_eta(complaint_id: str, eta_data: dict, updated_by: str):
+        try:
+            eta_hours = eta_data.get("eta_hours")
+            if eta_hours is None:
+                raise HTTPException(status_code=400, detail="eta_hours is required")
+            comment = eta_data.get("comment")
+            result = set_complaint_eta(complaint_id, eta_hours, updated_by, comment)
             return result
         except HTTPException:
             raise

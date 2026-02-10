@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import JSONResponse
 from typing import Optional
-from complaints import ComplaintCreate, ComplaintUpdate, ComplaintRating
+from complaints import ComplaintCreate, ComplaintUpdate, ComplaintRating, ComplaintEta
 from controllers.complaint_controller import ComplaintController
 
 router = APIRouter(prefix="/api/complaints", tags=["Complaints"])
@@ -79,6 +79,16 @@ async def rate_complaint(
 ):
     """Rate a complaint"""
     return ComplaintController.rate_complaint(complaint_id, rating_data, user_id)
+
+@router.put("/{complaint_id}/eta")
+async def set_complaint_eta(
+    complaint_id: str,
+    eta_data: ComplaintEta,
+    updated_by: str = Header(..., alias="X-User-ID")
+):
+    """Set estimated resolution time"""
+    payload = eta_data.model_dump() if hasattr(eta_data, "model_dump") else eta_data.dict()
+    return ComplaintController.set_eta(complaint_id, payload, updated_by)
 
 @router.get("/user/{user_id}")
 async def get_user_complaints(user_id: str):

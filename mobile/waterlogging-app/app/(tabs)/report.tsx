@@ -6,6 +6,7 @@ import * as Location from 'expo-location';
 import { Camera, MapPin, X, Upload, CheckCircle } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { API_BASE_URL } from '@/lib/config';
+import { useAuth } from '@/lib/AuthContext';
 import { getErrorMessage } from '@/lib/utils';
 import { useColorScheme } from 'nativewind';
 
@@ -15,6 +16,7 @@ export default function ReportScreen() {
     const [success, setSuccess] = useState(false);
     const { colorScheme } = useColorScheme();
     const isDark = colorScheme === 'dark';
+    const { authHeaders } = useAuth();
 
     const [formData, setFormData] = useState({
         title: '',
@@ -109,9 +111,7 @@ export default function ReportScreen() {
 
             const response = await fetch(`${API_BASE_URL}/api/complaints`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: authHeaders(),
                 body: JSON.stringify(payload),
             });
 

@@ -1,5 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 from core.state import state
 from routes import (
@@ -8,7 +10,8 @@ from routes import (
     notification_routes,
     map_routes,
     admin_routes,
-    safe_parking_routes
+    safe_parking_routes,
+    social_routes
 )
 
 @asynccontextmanager
@@ -19,6 +22,20 @@ async def lifespan(app: FastAPI):
     print("Shutting down...")
 
 app = FastAPI(title="Delhi Water-logging API", lifespan=lifespan)
+
+# Log request validation errors (422) before they reach route handlers
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    body_bytes = await request.body()
+    try:
+        body_text = body_bytes.decode("utf-8")
+    except Exception:
+        body_text = str(body_bytes)
+    print(f"[ValidationError] path={request.url.path} errors={exc.errors()} body={body_text}")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()},
+    )
 
 # CORS middleware
 app.add_middleware(
@@ -38,6 +55,7 @@ app.include_router(notification_routes.router)
 app.include_router(map_routes.router)
 app.include_router(admin_routes.router)
 app.include_router(safe_parking_routes.router)
+app.include_router(social_routes.router)
 
 @app.get("/")
 def read_root():
@@ -50,7 +68,8 @@ def read_root():
             "notifications": "/api/notifications",
             "map": "/api",
             "admin": "/api/admin",
-            "safe_parking": "/api/safe-parking"
+            "safe_parking": "/api/safe-parking",
+            "social": "/api/social"
         }
     }
 

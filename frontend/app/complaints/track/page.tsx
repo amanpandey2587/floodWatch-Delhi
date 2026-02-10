@@ -19,16 +19,16 @@ export default function TrackComplaintPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 py-12">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white rounded-lg shadow-lg p-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4 text-center">Track Complaint</h1>
-          <p className="text-gray-600 mb-8 text-center">
+        <div className="bg-white dark:bg-slate-900 rounded-lg shadow-lg p-8 border border-slate-200 dark:border-slate-800">
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-4 text-center">Track Complaint</h1>
+          <p className="text-slate-600 dark:text-slate-300 mb-8 text-center">
             Enter your complaint ID to track its status
           </p>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4 flex items-center gap-2">
+            <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-200 px-4 py-3 rounded mb-4 flex items-center gap-2">
               <AlertCircle className="w-5 h-5" />
               {error}
             </div>
@@ -36,7 +36,7 @@ export default function TrackComplaintPage() {
 
           <form onSubmit={handleTrack} className="space-y-4">
             <div>
-              <label htmlFor="complaint_id" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="complaint_id" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 Complaint ID
               </label>
               <input
@@ -48,7 +48,7 @@ export default function TrackComplaintPage() {
                   setError(null);
                 }}
                 placeholder="e.g., COMP-ABC12345"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-lg font-mono"
+                className="w-full px-4 py-3 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-lg font-mono"
               />
             </div>
             <button

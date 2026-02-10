@@ -8,7 +8,7 @@ export default function TrackComplaintDetailPage({ params }: { params: Promise<{
   const { id } = useParams();
   console.log("id is ",id);
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 py-12">
       <ComplaintDetail complaintId={id} />
     </div>
   );

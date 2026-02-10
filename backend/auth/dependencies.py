@@ -81,7 +81,11 @@ async def require_admin(current_user: dict = Depends(get_current_user)):
 
 async def require_ward_officer(current_user: dict = Depends(get_current_user)):
     """Dependency to require ward officer or admin role"""
-    if current_user.get("role") not in ["ward_officer", "admin"]:
+    role_raw = current_user.get("role")
+    role = str(role_raw or "").strip().lower()
+    print(f"[Auth] require_ward_officer role={role_raw} normalized={role} user_id={current_user.get('user_id')}")
+    # Treat admin and ward officer as equivalent for now
+    if role not in ["ward_officer", "admin", "ward_admin", "ward", "ward-officer", "ward officer", "wardadmin"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Ward officer or admin privileges required"

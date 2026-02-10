@@ -90,7 +90,7 @@ export default function MapComponent({ hotspots }: MapProps) {
                 <h3 className="font-bold text-lg mb-1">{hotspot.name}</h3>
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Risk Level:</span>
+                    <span className="text-slate-600 dark:text-slate-300">Risk Level:</span>
                     <span
                       className={`font-semibold ${
                         hotspot.risk_level === 0
@@ -104,7 +104,7 @@ export default function MapComponent({ hotspots }: MapProps) {
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Probability:</span>
+                    <span className="text-slate-600 dark:text-slate-300">Probability:</span>
                     <span className="font-semibold">
                       {(hotspot.probability * 100).toFixed(1)}%
                     </span>

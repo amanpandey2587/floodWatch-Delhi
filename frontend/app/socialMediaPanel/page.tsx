@@ -97,48 +97,44 @@ export default function SocialMediaPanel() {
   };
 
   const getPlatformEmoji = (platform: string): string => {
-    return platform === 'twitter' ? '🐦' : '✈️';
+    return platform === 'twitter' ? 'X' : 'Air';
   };
 
   return (
-    <div className="absolute bottom-4 left-4 z-[1000] bg-white rounded-lg shadow-lg max-w-md max-h-[70vh] overflow-hidden flex flex-col">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4">
-        <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+      <div className="max-w-6xl mx-auto px-6 py-10">
+        {/* Header */}
+        <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
           <div>
-            <h2 className="text-lg font-bold">📱 Social Media Monitor</h2>
-            <p className="text-xs opacity-90">Real-time waterlogging alerts</p>
+            <h1 className="text-3xl font-bold">Social Media Monitor</h1>
+            <p className="text-slate-600 dark:text-slate-300 mt-1">
+              Real-time waterlogging alerts and ward risk signals.
+            </p>
           </div>
           <button
             onClick={startMonitoring}
             disabled={loading}
-            className="bg-white text-blue-600 px-3 py-1 rounded-full text-xs font-bold hover:bg-blue-50 disabled:opacity-50"
+            className="px-4 py-2 rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-900 text-sm font-semibold"
           >
-            {loading ? '⏳' : '🔄'} Scan
+            {loading ? 'Loading' : 'Scan'}
           </button>
         </div>
-      </div>
 
-      {/* Controls */}
-      <div className="px-4 py-2 bg-gray-50 border-b flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="autoRefresh"
-            checked={autoRefresh}
-            onChange={(e) => setAutoRefresh(e.target.checked)}
-            className="rounded"
-          />
-          <label htmlFor="autoRefresh" className="text-xs text-gray-600">
-            Auto-refresh
-          </label>
-        </div>
-        {monitoringData && (
-          <span className="text-xs text-gray-500">
-            {monitoringData.total_posts} posts analyzed
-          </span>
+        {/* Controls */}
+        <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
+          <div className="flex items-center gap-2">
+                    {monitoringData && (
+          <div className="text-xs text-slate-500 dark:text-slate-400 text-center">
+            Last updated: {new Date(monitoringData.timestamp).toLocaleTimeString()}
+          </div>
         )}
-      </div>
+          </div>
+          {monitoringData && (
+            <span className="text-sm text-slate-500 dark:text-slate-400">
+              {monitoringData.total_posts} posts analyzed
+            </span>
+          )}
+        </div>
 
       {/* Error Display */}
       {error && (
@@ -148,19 +144,19 @@ export default function SocialMediaPanel() {
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="space-y-6">
         {loading && (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
-            <p className="text-sm text-gray-600">Scanning social media...</p>
+            <p className="text-sm text-slate-600 dark:text-slate-300">Scanning social media...</p>
           </div>
         )}
 
         {!loading && monitoringData && (
-          <>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Ward Risk Analysis */}
-            <div className="mb-4">
-              <h3 className="font-bold text-sm mb-2">🎯 Ward Alerts</h3>
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 hover:shadow-lg transition-shadow">
+              <h3 className="font-bold text-sm mb-3">Ward Alerts</h3>
               <div className="space-y-2">
                 {Object.entries(monitoringData.ward_analysis)
                   .sort(([, a], [, b]) => b.risk_spike - a.risk_spike)
@@ -169,7 +165,7 @@ export default function SocialMediaPanel() {
                     <div
                       key={ward}
                       onClick={() => setSelectedWard(selectedWard === ward ? null : ward)}
-                      className="bg-gray-50 p-3 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
+                      className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
@@ -182,9 +178,9 @@ export default function SocialMediaPanel() {
                               {getRiskLabel(stats.risk_spike)}
                             </span>
                           </div>
-                          <div className="flex gap-3 mt-1 text-xs text-gray-600">
-                            <span>📊 {stats.mention_count} mentions</span>
-                            <span>⚡ {(stats.avg_urgency * 100).toFixed(0)}% urgent</span>
+                          <div className="flex gap-3 mt-1 text-xs text-slate-600 dark:text-slate-300">
+                            <span>{stats.mention_count} mentions</span>
+                            <span>Urgency {(stats.avg_urgency * 100).toFixed(0)}%</span>
                           </div>
                         </div>
                         <div className="text-2xl font-bold" style={{ color: getRiskColor(stats.risk_spike) }}>
@@ -194,18 +190,18 @@ export default function SocialMediaPanel() {
 
                       {/* Expanded Details */}
                       {selectedWard === ward && (
-                        <div className="mt-3 pt-3 border-t border-gray-200">
+                        <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-800">
                           <div className="grid grid-cols-2 gap-2 text-xs">
                             <div>
-                              <span className="text-gray-500">Sentiment:</span>
+                              <span className="text-slate-500 dark:text-slate-400">Sentiment:</span>
                               <span className="ml-2 font-semibold">
-                                {stats.avg_sentiment > 0 ? '😊' : stats.avg_sentiment < 0 ? '😟' : '😐'}
+                                {stats.avg_sentiment > 0 ? 'Positive' : stats.avg_sentiment < 0 ? 'Negative' : 'Neutral'}
                                 {' '}
                                 {stats.avg_sentiment.toFixed(2)}
                               </span>
                             </div>
                             <div>
-                              <span className="text-gray-500">Risk Spike:</span>
+                              <span className="text-slate-500 dark:text-slate-400">Risk Spike:</span>
                               <span className="ml-2 font-semibold">
                                 {(stats.risk_spike * 100).toFixed(1)}%
                               </span>
@@ -219,31 +215,31 @@ export default function SocialMediaPanel() {
             </div>
 
             {/* Recent Posts */}
-            <div>
-              <h3 className="font-bold text-sm mb-2">💬 Recent Posts</h3>
-              <div className="space-y-2">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 hover:shadow-lg transition-shadow">
+              <h3 className="font-bold text-sm mb-3">Recent Posts</h3>
+              <div className="space-y-3">
                 {monitoringData.recent_posts.slice(0, 5).map((post, idx) => (
                   <div
                     key={idx}
-                    className="bg-gradient-to-br from-blue-50 to-purple-50 p-3 rounded-lg border border-blue-100"
+                    className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                   >
                     <div className="flex items-start gap-2">
                       <span className="text-lg">{getPlatformEmoji(post.platform)}</span>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs text-gray-700 line-clamp-3 mb-1">
+                        <p className="text-xs text-slate-800 dark:text-slate-100 line-clamp-3 mb-1">
                           {post.text}
                         </p>
-                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
                           {post.ward && (
-                            <span className="bg-white px-2 py-0.5 rounded">
-                              📍 {post.ward}
+                            <span className="bg-slate-100 dark:bg-slate-900 px-2 py-0.5 rounded">
+                              {post.ward}
                             </span>
                           )}
                           <span
                             className="px-2 py-0.5 rounded text-white font-semibold"
                             style={{ backgroundColor: getRiskColor(post.urgency) }}
                           >
-                            ⚡ {(post.urgency * 100).toFixed(0)}%
+                            Urgency {(post.urgency * 100).toFixed(0)}%
                           </span>
                         </div>
                       </div>
@@ -252,12 +248,12 @@ export default function SocialMediaPanel() {
                 ))}
               </div>
             </div>
-          </>
+          </div>
         )}
 
         {!loading && !monitoringData && !error && (
           <div className="text-center py-8">
-            <p className="text-gray-500 text-sm mb-3">No monitoring data available</p>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mb-3">No monitoring data available</p>
             <button
               onClick={startMonitoring}
               className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-600"
@@ -268,12 +264,7 @@ export default function SocialMediaPanel() {
         )}
       </div>
 
-      {/* Footer */}
-      {monitoringData && (
-        <div className="px-4 py-2 bg-gray-50 border-t text-xs text-gray-500 text-center">
-          Last updated: {new Date(monitoringData.timestamp).toLocaleTimeString()}
-        </div>
-      )}
+      </div>
     </div>
   );
 }

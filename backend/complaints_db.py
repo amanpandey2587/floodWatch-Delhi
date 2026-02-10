@@ -85,6 +85,8 @@ def file_complaint(complaint_data: ComplaintCreate, user_id: str) -> dict:
         "resolution": None,
         "rating": None,
         "feedback": None,
+        "eta_hours": None,
+        "eta_updated_at": None,
         "created_at": now,
         "updated_at": now
     }
@@ -125,6 +127,8 @@ def get_complaint_by_id(complaint_id: str) -> Optional[dict]:
             complaint["in_progress_at"] = complaint["in_progress_at"].isoformat() if complaint["in_progress_at"] else None
         if "resolved_at" in complaint and isinstance(complaint["resolved_at"], datetime):
             complaint["resolved_at"] = complaint["resolved_at"].isoformat() if complaint["resolved_at"] else None
+        if "eta_updated_at" in complaint and isinstance(complaint["eta_updated_at"], datetime):
+            complaint["eta_updated_at"] = complaint["eta_updated_at"].isoformat() if complaint["eta_updated_at"] else None
         # Convert timeline datetimes
         if "timeline" in complaint:
             for entry in complaint["timeline"]:
@@ -244,6 +248,27 @@ def add_timeline_entry(complaint_id: str, entry: dict) -> dict:
         raise HTTPException(status_code=404, detail="Complaint not found")
     
     ComplaintModel.add_timeline_entry(complaint_id, entry)
+    return get_complaint_by_id(complaint_id)
+
+def set_complaint_eta(complaint_id: str, eta_hours: float, updated_by: str, comment: Optional[str] = None) -> dict:
+    """Set estimated resolution time for a complaint"""
+    complaint = get_complaint_by_id(complaint_id)
+    if not complaint:
+        raise HTTPException(status_code=404, detail="Complaint not found")
+
+    now = datetime.now()
+    ComplaintModel.update(complaint_id, {
+        "eta_hours": float(eta_hours),
+        "eta_updated_at": now
+    })
+
+    remarks = comment.strip() if isinstance(comment, str) and comment.strip() else f"ETA set to {eta_hours} hours"
+    ComplaintModel.add_timeline_entry(complaint_id, {
+        "status": "eta_update",
+        "remarks": remarks,
+        "updated_by": updated_by
+    })
+
     return get_complaint_by_id(complaint_id)
 
 def resolve_complaint(complaint_id: str, resolution: str, resolved_by: str) -> dict:

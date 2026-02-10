@@ -16,8 +16,8 @@ export default function MapModeToggle({ currentMode, onModeChange }: MapModeTogg
   ]
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-4">
-      <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+    <div className="bg-white/95 dark:bg-slate-900/90 rounded-lg shadow-lg p-4 border border-slate-200 dark:border-slate-800">
+      <h3 className="font-semibold text-slate-800 dark:text-slate-100 mb-3 flex items-center gap-2">
         <Map className="w-5 h-5" />
         Map Display Mode
       </h3>
@@ -33,13 +33,13 @@ export default function MapModeToggle({ currentMode, onModeChange }: MapModeTogg
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
                 isActive
                   ? 'bg-blue-600 text-white shadow-md'
-                  : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                  : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'
               }`}
             >
-              <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-gray-600'}`} />
+              <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-600 dark:text-slate-300'}`} />
               <div className="flex-1 text-left">
                 <div className="font-medium">{mode.label}</div>
-                <div className={`text-xs ${isActive ? 'text-blue-100' : 'text-gray-500'}`}>
+                <div className={`text-xs ${isActive ? 'text-blue-100' : 'text-slate-500 dark:text-slate-400'}`}>
                   {mode.description}
                 </div>
               </div>

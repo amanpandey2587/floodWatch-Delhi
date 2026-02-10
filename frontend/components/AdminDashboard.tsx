@@ -2,26 +2,20 @@
 
 import { useState, useEffect } from 'react';
 import { useAdminAPI } from '@/lib/api';
-import { useAuth, useUser } from '@clerk/nextjs';
-import AdminStats from './AdminStats';
-import AdminComplaints from './AdminComplaints';
+import { useAuth } from '@/lib/AuthContext';
 import NotificationBroadcast from './NotificationBroadcast';
 import SOSBroadcast from './SOSBroadcast';
 import { AlertCircle } from 'lucide-react';
 
 export default function AdminDashboard() {
-  const { userId } = useAuth();
-  const { user } = useUser();
+  const { user } = useAuth();
   const adminAPI = useAdminAPI();
-  const [stats, setStats] = useState<any>(null);
-  const [complaints, setComplaints] = useState<any[]>([]);
   const [wards, setWards] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // TEMPORARY: Open access for testing
-  const role = "ward_admin";
-  const wardNumber = 44;
+  const role = user?.role || 'citizen';
+  const wardNumber = user?.ward_number ?? 44;
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -35,25 +29,7 @@ export default function AdminDashboard() {
         
         console.log('Dashboard data received:', dashboardData);
         
-        // Set stats with defaults
-        setStats(dashboardData.stats || {
-          total_complaints: 0,
-          pending: 0,
-          acknowledged: 0,
-          in_progress: 0,
-          resolved: 0,
-          high_priority: 0,
-          avg_response_time: null,
-          satisfaction_rate: null,
-        });
-        
-        // Set complaints (ensure it's an array)
-        if (Array.isArray(dashboardData.recent_complaints)) {
-          setComplaints(dashboardData.recent_complaints);
-        } else {
-          console.warn('recent_complaints is not an array:', dashboardData.recent_complaints);
-          setComplaints([]);
-        }
+        // Data fetched for health check; dashboard renders broadcast controls only
       } catch (err: any) {
         console.error('Error fetching dashboard:', err);
         
@@ -85,9 +61,9 @@ export default function AdminDashboard() {
 
   // Fetch wards for SOS broadcast
   useEffect(() => {
-    const fetchWards = async () => {
-      try {
-        const response = await fetch('http://localhost:8000/wards');
+      const fetchWards = async () => {
+        try {
+        const response = await fetch('http://localhost:8000/api/wards');
         
         if (!response.ok) {
           throw new Error(`Failed to fetch wards: ${response.statusText}`);
@@ -117,22 +93,7 @@ export default function AdminDashboard() {
       
       const dashboardData = await adminAPI.getDashboard(wardNumber);
       
-      setStats(dashboardData.stats || {
-        total_complaints: 0,
-        pending: 0,
-        acknowledged: 0,
-        in_progress: 0,
-        resolved: 0,
-        high_priority: 0,
-        avg_response_time: null,
-        satisfaction_rate: null,
-      });
-      
-      if (Array.isArray(dashboardData.recent_complaints)) {
-        setComplaints(dashboardData.recent_complaints);
-      } else {
-        setComplaints([]);
-      }
+      // Dashboard renders broadcast controls only
     } catch (err: any) {
       console.error('Error refreshing dashboard:', err);
       
@@ -150,11 +111,11 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+      <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600 text-lg">Loading Admin Dashboard...</p>
-          <p className="text-gray-500 text-sm mt-2">Ward {wardNumber}</p>
+          <p className="text-slate-600 dark:text-slate-300 text-lg">Loading Admin Dashboard...</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-2">Ward {wardNumber}</p>
         </div>
       </div>
     );
@@ -162,16 +123,16 @@ export default function AdminDashboard() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-8">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-8">
         <div className="max-w-2xl w-full">
-          <div className="bg-red-50 border-2 border-red-200 text-red-700 px-6 py-8 rounded-lg">
+          <div className="bg-red-50 dark:bg-red-950/40 border-2 border-red-200 dark:border-red-800 text-red-700 dark:text-red-200 px-6 py-8 rounded-lg">
             <div className="flex items-start gap-3">
               <AlertCircle className="w-6 h-6 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <h3 className="font-semibold text-lg mb-2">Error Loading Dashboard</h3>
                 <p className="text-sm mb-4">{error}</p>
                 
-                <div className="bg-red-100 border border-red-300 rounded p-3 mb-4 text-xs">
+                <div className="bg-red-100 dark:bg-red-900/40 border border-red-300 dark:border-red-800 rounded p-3 mb-4 text-xs">
                   <strong>Troubleshooting:</strong>
                   <ul className="list-disc list-inside mt-2 space-y-1">
                     <li>Make sure the backend server is running on http://localhost:8000</li>
@@ -196,48 +157,31 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
       <div className="max-w-7xl mx-auto p-8">
         {/* Header Section */}
         <div className="mb-8">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
-              <p className="text-gray-600 text-lg">
-                Ward {wardNumber} Management • FloodWatch Delhi
+              <h1 className="text-4xl font-bold text-slate-900 dark:text-white mb-2">Admin Dashboard</h1>
+              <p className="text-slate-600 dark:text-slate-300 text-lg">
+                Ward {wardNumber} Management - FloodWatch Delhi
               </p>
             </div>
-            <div className="bg-blue-100 text-blue-800 px-4 py-2 rounded-lg">
-              <p className="text-sm font-medium">Role: Ward Admin</p>
-              <p className="text-xs text-blue-600">Testing Mode - Open Access</p>
+            <div className="bg-blue-100 dark:bg-blue-950/50 text-blue-800 dark:text-blue-200 px-4 py-2 rounded-lg">
+              <p className="text-sm font-medium">Role: {role}</p>
             </div>
           </div>
         </div>
 
-        {/* Stats Section */}
-        {stats && <AdminStats stats={stats} />}
-
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* Left Column - Broadcast Controls */}
-          <div className="space-y-8">
-            <NotificationBroadcast onSuccess={handleRefresh} />
-            <SOSBroadcast wards={wards.map((w) => ({ id: w.id, name: w.name }))} />
-          </div>
-
-          {/* Right Column - Complaints Management */}
-          <div>
-            <AdminComplaints complaints={complaints} />
-          </div>
+        {/* Broadcast Controls */}
+        <div className="space-y-8 mb-8">
+          <NotificationBroadcast onSuccess={handleRefresh} />
+          <SOSBroadcast wards={wards.map((w) => ({ id: w.id, name: w.name }))} />
         </div>
 
         {/* Footer Info */}
-        <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <p className="text-sm text-yellow-800">
-            <strong>⚠️ Testing Mode:</strong> Admin access is currently open for all users to preview the dashboard. 
-            In production, this will be restricted to authorized administrators only.
-          </p>
-        </div>
+
       </div>
     </div>
   );

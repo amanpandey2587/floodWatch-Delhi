@@ -92,7 +92,7 @@ export default function RoutePanel({ onRouteCalculated, onClearRoute }: RoutePan
 
       {/* Start Point */}
       <div className="mb-4">
-        <label className="block text-sm font-bold mb-2">📍 Start Point</label>
+        <label className="block text-sm font-bold mb-2">Start Point</label>
         <input
           type="text"
           placeholder="Enter start location (e.g. CP)"
@@ -104,7 +104,7 @@ export default function RoutePanel({ onRouteCalculated, onClearRoute }: RoutePan
 
       {/* End Point */}
       <div className="mb-4">
-        <label className="block text-sm font-bold mb-2">🎯 End Point</label>
+        <label className="block text-sm font-bold mb-2">End Point</label>
         <input
           type="text"
           placeholder="Enter destination"
@@ -116,15 +116,15 @@ export default function RoutePanel({ onRouteCalculated, onClearRoute }: RoutePan
 
       {/* Travel Mode */}
       <div className="mb-4">
-        <label className="block text-sm font-bold mb-2">🚗 Travel Mode</label>
+        <label className="block text-sm font-bold mb-2">Travel Mode</label>
         <select
           value={profile}
           onChange={(e) => setProfile(e.target.value)}
           className="w-full p-2 border rounded"
         >
-          <option value="driving">🚗 Driving</option>
-          <option value="walking">🚶 Walking</option>
-          <option value="cycling">🚴 Cycling</option>
+          <option value="driving">Driving</option>
+          <option value="walking">Walking</option>
+          <option value="cycling">Cycling</option>
         </select>
       </div>
 
@@ -135,14 +135,14 @@ export default function RoutePanel({ onRouteCalculated, onClearRoute }: RoutePan
           disabled={loading}
           className="flex-1 bg-blue-500 text-white p-2 rounded hover:bg-blue-600 disabled:bg-gray-400"
         >
-          {loading ? '⏳ Calculating...' : '🔍 Find Route'}
+          {loading ? 'Calculating...' : 'Find Route'}
         </button>
         {routeInfo && (
           <button
             onClick={handleClear}
             className="bg-red-500 text-white p-2 rounded hover:bg-red-600"
           >
-            ❌ Clear
+            Clear
           </button>
         )}
       </div>
@@ -157,7 +157,7 @@ export default function RoutePanel({ onRouteCalculated, onClearRoute }: RoutePan
       {/* Route Info */}
       {routeInfo && (
         <div className="border-t pt-4">
-          <h3 className="font-bold mb-2">📊 Route Summary</h3>
+          <h3 className="font-bold mb-2">Route Summary</h3>
 
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
@@ -193,7 +193,7 @@ export default function RoutePanel({ onRouteCalculated, onClearRoute }: RoutePan
 
             {routeInfo.risk_analysis.warning_count > 0 && (
               <div className="bg-yellow-100 border border-yellow-400 text-yellow-800 px-3 py-2 rounded mt-2">
-                ⚠️ {routeInfo.risk_analysis.warning_count} high-risk segment(s) detected!
+                {routeInfo.risk_analysis.warning_count} high-risk segment(s) detected.
               </div>
             )}
           </div>
@@ -202,7 +202,7 @@ export default function RoutePanel({ onRouteCalculated, onClearRoute }: RoutePan
 
       {/* Instructions */}
       <div className="mt-4 text-xs text-gray-500 border-t pt-2">
-        💡 Tip: Enter location names to find the safest route.
+        Tip: Enter location names to find the safest route.
       </div>
     </div>
   );

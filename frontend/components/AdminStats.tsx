@@ -68,7 +68,7 @@ export default function AdminStats({ stats }: AdminStatsProps) {
         return (
           <div
             key={idx}
-            className={`${stat.bgColor} rounded-lg p-6 border border-gray-200`}
+            className={`${stat.bgColor} rounded-lg p-6 border border-slate-200 dark:border-slate-800`}
           >
             <div className="flex items-center justify-between mb-2">
               <Icon className={`w-8 h-8 ${stat.color} text-white rounded-lg p-1.5`} />
@@ -76,7 +76,7 @@ export default function AdminStats({ stats }: AdminStatsProps) {
             <div className={`text-3xl font-bold ${stat.textColor} mb-1`}>
               {stat.value}
             </div>
-            <div className="text-sm text-gray-600">{stat.title}</div>
+            <div className="text-sm text-slate-600 dark:text-slate-300">{stat.title}</div>
           </div>
         );
       })}

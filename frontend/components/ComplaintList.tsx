@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useComplaintAPI } from '@/lib/api';
-import { useAuth } from '@clerk/nextjs';
+import { useAuth } from '@/lib/AuthContext';
 import Link from 'next/link';
 import { Clock, MapPin, AlertCircle, CheckCircle, XCircle, Loader } from 'lucide-react';
 
@@ -27,14 +27,14 @@ interface Complaint {
 }
 
 export default function ComplaintList({ filterStatus }: { filterStatus?: string }) {
-  const { userId, sessionClaims } = useAuth();
+  const { user } = useAuth();
   const complaintAPI = useComplaintAPI();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const role = (sessionClaims?.metadata?.role as string) || 'citizen';
-  const wardNumber = sessionClaims?.metadata?.ward_number as number | undefined;
+  const role = user?.role || 'citizen';
+  const wardNumber = user?.ward_number;
 
   useEffect(() => {
     const fetchComplaints = async () => {
@@ -43,7 +43,7 @@ export default function ComplaintList({ filterStatus }: { filterStatus?: string 
         setError(null);
 
         const filters: any = {};
-        if (role === 'ward_admin' && wardNumber) {
+        if ((role === 'ward_officer' || role === 'ward_admin') && wardNumber) {
           filters.ward_number = wardNumber;
         }
         if (filterStatus) {
@@ -66,10 +66,10 @@ export default function ComplaintList({ filterStatus }: { filterStatus?: string 
       }
     };
 
-    if (userId) {
+    if (user?.user_id) {
       fetchComplaints();
     }
-  }, [userId, role, wardNumber, filterStatus]);
+  }, [user?.user_id, role, wardNumber, filterStatus]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -166,7 +166,7 @@ export default function ComplaintList({ filterStatus }: { filterStatus?: string 
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
           <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-          <p className="text-gray-600">Loading complaints...</p>
+          <p className="text-slate-600 dark:text-slate-300">Loading complaints...</p>
         </div>
       </div>
     );
@@ -174,7 +174,7 @@ export default function ComplaintList({ filterStatus }: { filterStatus?: string 
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+      <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-200 px-4 py-3 rounded mb-4">
         {error}
       </div>
     );
@@ -183,8 +183,8 @@ export default function ComplaintList({ filterStatus }: { filterStatus?: string 
   if (complaints.length === 0) {
     return (
       <div className="text-center py-12">
-        <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-        <p className="text-gray-600 text-lg">No complaints found</p>
+        <AlertCircle className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+        <p className="text-slate-600 dark:text-slate-300 text-lg">No complaints found</p>
         <Link
           href="/complaints/file"
           className="mt-4 inline-block text-blue-600 hover:text-blue-700 font-medium"
@@ -198,15 +198,15 @@ export default function ComplaintList({ filterStatus }: { filterStatus?: string 
   return (
     <div className="space-y-4">
       {complaints.map((complaint) => (
-        <Link
+        <div
           key={complaint.complaint_id}
-          href={`/complaints/${complaint.complaint_id}`}
-          className="block bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow"
+          className="block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-6 hover:shadow-lg transition-shadow"
         >
-          <div className="flex items-start justify-between">
+          <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
+              <Link href={`/complaints/${complaint.complaint_id}`}>
               <div className="flex items-center gap-3 mb-2">
-                <h3 className="text-lg font-semibold text-gray-900">{complaint.title}</h3>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{complaint.title}</h3>
                 <span
                   className={`px-2 py-1 text-xs font-semibold rounded-full border flex items-center gap-1 ${getStatusColor(
                     complaint.status
@@ -220,8 +220,8 @@ export default function ComplaintList({ filterStatus }: { filterStatus?: string 
                   title={`Priority: ${complaint.priority}`}
                 />
               </div>
-              <p className="text-gray-600 mb-3 line-clamp-2">{complaint.description}</p>
-              <div className="flex items-center gap-4 text-sm text-gray-500">
+              <p className="text-slate-600 dark:text-slate-300 mb-3 line-clamp-2">{complaint.description}</p>
+              <div className="flex items-center gap-4 text-sm text-slate-500 dark:text-slate-400">
                 <span className="flex items-center gap-1">
                   <MapPin className="w-4 h-4" />
                   Ward {complaint.ward_number}
@@ -232,6 +232,7 @@ export default function ComplaintList({ filterStatus }: { filterStatus?: string 
                 </span>
                 <span className="capitalize">{complaint.category}</span>
               </div>
+              </Link>
 
               {/* SLA Tracking */}
               {complaint.sla_info && (
@@ -239,19 +240,19 @@ export default function ComplaintList({ filterStatus }: { filterStatus?: string 
                   <div className="flex items-center justify-between text-xs mb-2">
                     <div className="flex items-center gap-2 text-gray-600">
                       <Clock className="w-3 h-3" style={{ color: getSLAColor(complaint.sla_info.sla_status) }} />
-                      <span>Reported {getTimeAgo(complaint.created_at)}</span>
-                    </div>
+                  <span>Reported {getTimeAgo(complaint.created_at)}</span>
+                </div>
                     <span
                       className="font-semibold"
                       style={{ color: getSLAColor(complaint.sla_info.sla_status) }}
                     >
                       {complaint.status !== 'resolved'
                         ? `${Math.floor(complaint.sla_info.remaining_hours)}h remaining`
-                        : complaint.sla_info.sla_status === 'met' ? 'SLA Met ✓' : 'SLA Breached'
+                        : complaint.sla_info.sla_status === 'met' ? 'SLA Met' : 'SLA Breached'
                       }
                     </span>
                   </div>
-                  <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                  <div className="h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all"
                       style={{
@@ -266,16 +267,30 @@ export default function ComplaintList({ filterStatus }: { filterStatus?: string 
               {/* Water Depth Marker */}
               {complaint.water_depth && (
                 <div className="mt-2 flex items-center gap-2 text-xs">
-                  <span className="text-gray-500">Water:</span>
+                  <span className="text-slate-500">Water:</span>
                   <span className="font-semibold text-blue-600">{complaint.water_depth}</span>
                 </div>
               )}
             </div>
             <div className="ml-4 text-right">
-              <span className="text-sm font-mono text-gray-500">{complaint.complaint_id}</span>
+              <span className="text-sm font-mono text-slate-500 dark:text-slate-400">{complaint.complaint_id}</span>
+              <div className="mt-3 flex flex-col gap-2">
+                <Link
+                  href={`/complaints/${complaint.complaint_id}`}
+                  className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+                >
+                  View Details
+                </Link>
+                <Link
+                  href={`/complaints/track/${complaint.complaint_id}`}
+                  className="text-xs font-semibold text-emerald-600 hover:text-emerald-700"
+                >
+                  Track Complaint
+                </Link>
+              </div>
             </div>
           </div>
-        </Link>
+        </div>
       ))}
     </div>
   );

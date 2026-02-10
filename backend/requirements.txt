@@ -15,4 +15,5 @@ python-multipart
 openai>=1.0.0
 geopandas
 python-jose
-passlib
+passlib[bcrypt]
+bcrypt<4.0.0

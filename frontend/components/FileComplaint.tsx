@@ -167,8 +167,8 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-8 bg-white rounded-lg shadow-lg">
-      <h2 className="text-3xl font-bold text-gray-900 mb-6 text-center">
+    <div className="max-w-3xl mx-auto p-8 bg-white dark:bg-slate-900 rounded-lg shadow-lg border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100">
+      <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-6 text-center">
         File a New Complaint
       </h2>
       {error && (
@@ -187,7 +187,7 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
         <div>
           <label
             htmlFor="title"
-            className="block text-sm font-medium text-gray-700 mb-2"
+            className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
           >
             Title
           </label>
@@ -199,7 +199,7 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
               setFormData({ ...formData, title: e.target.value })
             }
             required
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="e.g., Severe waterlogging near XYZ market"
           />
         </div>
@@ -207,7 +207,7 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
         <div>
           <label
             htmlFor="description"
-            className="block text-sm font-medium text-gray-700 mb-2"
+            className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
           >
             Description
           </label>
@@ -219,7 +219,7 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
             }
             required
             rows={5}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Provide detailed information about the waterlogging incident..."
           ></textarea>
         </div>
@@ -228,7 +228,7 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
           <div>
             <label
               htmlFor="category"
-              className="block text-sm font-medium text-gray-700 mb-2"
+              className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
             >
               Category
             </label>
@@ -239,7 +239,7 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
                 setFormData({ ...formData, category: e.target.value })
               }
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">Select Category</option>
               <option value="Waterlogging">Waterlogging</option>
@@ -252,7 +252,7 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
           <div>
             <label
               htmlFor="ward_number"
-              className="block text-sm font-medium text-gray-700 mb-2"
+              className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
             >
               Ward Number
             </label>
@@ -269,7 +269,7 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
               required
               min="1"
               max="272"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
         </div>
@@ -277,7 +277,7 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
         <div>
           <label
             htmlFor="priority"
-            className="block text-sm font-medium text-gray-700 mb-2"
+            className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
           >
             Priority
           </label>
@@ -287,7 +287,7 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
             onChange={(e) =>
               setFormData({ ...formData, priority: e.target.value })
             }
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="low">Low</option>
             <option value="medium">Medium</option>
@@ -297,18 +297,18 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
             Location (Optional)
           </label>
           <button
             type="button"
             onClick={getCurrentLocation}
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+            className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
           >
-            {formData.location ? "✓ Location Captured" : "Use Current Location"}
+            {formData.location ? "Location Captured" : "Use Current Location"}
           </button>
           {formData.location && (
-            <p className="mt-2 text-sm text-gray-600">
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
               Lat: {formData.location.latitude.toFixed(6)}, Lng:{" "}
               {formData.location.longitude.toFixed(6)}
             </p>
@@ -319,7 +319,7 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
         <div>
           <label
             htmlFor="attachments"
-            className="block text-sm font-medium text-gray-700 mb-2"
+            className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
           >
             Photos (Optional, max {MAX_FILES})
           </label>
@@ -329,7 +329,7 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
             accept="image/*"
             multiple
             onChange={handleFileChange}
-            className="block w-full text-sm text-gray-500
+            className="block w-full text-sm text-slate-500
               file:mr-4 file:py-2 file:px-4
               file:rounded-full file:border-0
               file:text-sm file:font-semibold
@@ -373,7 +373,7 @@ export default function FileComplaint({ onSuccess }: FileComplaintProps) {
           <button
             type="button"
             onClick={() => router.back()}
-            className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+            className="px-6 py-3 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-lg font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
           >
             Cancel
           </button>

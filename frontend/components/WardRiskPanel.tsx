@@ -48,13 +48,13 @@ export default function WardRiskPanel({ rainfallIntensity }: WardRiskPanelProps)
   const getRiskColor = (riskLevel: number) => {
     switch (riskLevel) {
       case 0:
-        return 'text-green-600 bg-green-50 border-green-200'
+        return 'text-green-600 bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800'
       case 1:
-        return 'text-orange-600 bg-orange-50 border-orange-200'
+        return 'text-orange-600 bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800'
       case 2:
-        return 'text-red-600 bg-red-50 border-red-200'
+        return 'text-red-600 bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800'
       default:
-        return 'text-gray-600 bg-gray-50 border-gray-200'
+        return 'text-slate-600 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800'
     }
   }
 
@@ -80,8 +80,8 @@ export default function WardRiskPanel({ rainfallIntensity }: WardRiskPanelProps)
 
   if (loading) {
     return (
-      <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-xl p-4 min-w-[350px]">
-        <div className="flex items-center justify-center gap-2 text-gray-600">
+      <div className="bg-white/95 dark:bg-slate-900/90 backdrop-blur-sm rounded-lg shadow-xl p-4 min-w-[350px] border border-slate-200 dark:border-slate-800">
+        <div className="flex items-center justify-center gap-2 text-slate-600 dark:text-slate-300">
           <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
           <span>Loading ward risks...</span>
         </div>
@@ -90,10 +90,10 @@ export default function WardRiskPanel({ rainfallIntensity }: WardRiskPanelProps)
   }
 
   return (
-    <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-xl p-4 min-w-[350px] max-h-[600px] overflow-y-auto">
+    <div className="bg-white/95 dark:bg-slate-900/90 backdrop-blur-sm rounded-lg shadow-xl p-4 min-w-[350px] max-h-[600px] overflow-y-auto border border-slate-200 dark:border-slate-800">
       <div className="flex items-center gap-2 mb-4">
         <Map className="w-5 h-5 text-blue-600" />
-        <h3 className="text-lg font-semibold text-gray-800">Ward Risk Index</h3>
+        <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Ward Risk Index</h3>
       </div>
 
       <div className="space-y-3">
@@ -139,16 +139,16 @@ export default function WardRiskPanel({ rainfallIntensity }: WardRiskPanelProps)
                 </div>
                 <div className="flex justify-between">
                   <span>Drains:</span>
-                  <span>{ward.drains_desilted ? 'Desilted ✓' : 'Not Desilted ✗'}</span>
+                  <span>{ward.drains_desilted ? 'Desilted' : 'Not Desilted'}</span>
                 </div>
               </div>
 
               {/* Preparedness Gap Warning */}
               {ward.has_preparedness_gap && (
-                <div className="mt-2 p-2 bg-red-100 border border-red-300 rounded text-xs">
+                <div className="mt-2 p-2 bg-red-100 dark:bg-red-950/40 border border-red-300 dark:border-red-800 rounded text-xs">
                   <div className="flex items-start gap-1">
-                    <AlertTriangle className="w-3 h-3 text-red-600 mt-0.5 flex-shrink-0" />
-                    <span className="text-red-800 font-medium">
+                    <AlertTriangle className="w-3 h-3 text-red-600 dark:text-red-300 mt-0.5 flex-shrink-0" />
+                    <span className="text-red-800 dark:text-red-200 font-medium">
                       {ward.preparedness_gap_message || 'Preparedness GAP: Insufficient infrastructure'}
                     </span>
                   </div>

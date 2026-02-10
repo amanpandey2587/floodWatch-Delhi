@@ -42,11 +42,11 @@ export default function HomeScreen() {
           {/* Quick Actions */}
           <View className="flex-row gap-4 mb-8">
             <TouchableOpacity
-              className="flex-1 bg-gradient-to-r from-cyan-600 to-blue-600 p-4 rounded-xl items-center shadow-lg shadow-cyan-500/20"
+              className="flex-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 p-4 rounded-xl items-center shadow-sm"
               onPress={() => router.push('/(tabs)/map' as any)}
             >
-              <Map size={24} color="white" className="mb-2" />
-              <Text className="text-white font-bold text-base">View Map</Text>
+              <Map size={24} color={isDark ? "#94a3b8" : "#475569"} className="mb-2"  />
+              <Text className="text-gray-700 dark:text-slate-200 font-bold text-base">Map</Text>
             </TouchableOpacity>
 
             <TouchableOpacity

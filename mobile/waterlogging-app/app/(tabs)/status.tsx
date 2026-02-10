@@ -5,6 +5,8 @@ import { Clock, AlertCircle, CheckCircle, XCircle, MapPin, Loader, RefreshCw } f
 import { API_BASE_URL } from '@/lib/config';
 import { getErrorMessage } from '@/lib/utils';
 import { useColorScheme } from 'nativewind';
+import { useAuth } from '@/lib/AuthContext';
+import { useRouter } from 'expo-router';
 
 interface Complaint {
     complaint_id: string;
@@ -31,10 +33,14 @@ export default function StatusScreen() {
     const [error, setError] = useState<string | null>(null);
     const { colorScheme } = useColorScheme();
     const isDark = colorScheme === 'dark';
+    const { authHeaders } = useAuth();
+    const router = useRouter();
 
     const fetchComplaints = async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/complaints`); // Add filters if backend supports ?user_id=... or Clerk handles it
+            const response = await fetch(`${API_BASE_URL}/api/complaints`, {
+                headers: authHeaders(),
+            });
 
             if (!response.ok) {
                 throw new Error('Failed to fetch complaints');
@@ -120,7 +126,10 @@ export default function StatusScreen() {
         };
 
         return (
-            <View className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4 mb-4 shadow-sm">
+            <TouchableOpacity
+                onPress={() => router.push(`/(tabs)/status/${item.complaint_id}`)}
+                className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4 mb-4 shadow-sm"
+            >
                 <View className="flex-row justify-between items-start mb-2">
                     <View className="flex-1 mr-4">
                         <Text className="text-gray-900 dark:text-white font-bold text-lg mb-1">{item.title}</Text>
@@ -184,7 +193,7 @@ export default function StatusScreen() {
                         <Text className="text-xs font-semibold text-blue-600 dark:text-blue-400">{item.water_depth}</Text>
                     </View>
                 )}
-            </View>
+            </TouchableOpacity>
         );
     }
 

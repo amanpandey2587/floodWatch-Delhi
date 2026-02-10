@@ -6,11 +6,12 @@ from notifications import create_ward_broadcast
 class AdminController:
     @staticmethod
     def get_dashboard(ward_number: int, role: str, user_id: str):
-        if role not in ["ward_admin", "admin"]:
+        role_norm = str(role or "").strip().lower()
+        if role_norm not in ["ward_admin", "admin", "ward_officer", "ward"]:
             raise HTTPException(status_code=403, detail="Admin access required")
         
         try:
-            if role == "ward_admin" and not ward_number:
+            if role_norm in ["ward_admin", "ward_officer", "ward"] and not ward_number:
                 user = UserModel.find_by_id(user_id)
                 if user and user.get("ward_number"):
                     ward_number = user.get("ward_number")
@@ -30,7 +31,8 @@ class AdminController:
         print(f"[Admin Broadcast] Received request from user_id: {user_id}, role: {role}")
         print(f"[Admin Broadcast] Request data: {broadcast_data}")
         
-        if role not in ["ward_admin", "admin"]:
+        role_norm = str(role or "").strip().lower()
+        if role_norm not in ["ward_admin", "admin", "ward_officer", "ward"]:
             print(f"[Admin Broadcast] ERROR: Access denied - Invalid role: {role}")
             raise HTTPException(status_code=403, detail="Admin access required")
         
@@ -41,7 +43,7 @@ class AdminController:
             
             print(f"[Admin Broadcast] Ward: {ward_number}, Title: {title}")
             
-            if role == "ward_admin":
+            if role_norm in ["ward_admin", "ward_officer", "ward"]:
                 print(f"[Admin Broadcast] Checking ward_admin permissions...")
                 user = UserModel.find_by_id(user_id)
                 print(f"[Admin Broadcast] User from DB: {user}")

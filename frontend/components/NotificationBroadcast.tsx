@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAdminAPI } from '@/lib/api';
-import { useUser } from '@clerk/nextjs';
+import { useAuth } from '@/lib/AuthContext';
 import { Send, AlertCircle } from 'lucide-react';
 
 interface NotificationBroadcastProps {
@@ -10,17 +10,22 @@ interface NotificationBroadcastProps {
 }
 
 export default function NotificationBroadcast({ onSuccess }: NotificationBroadcastProps) {
-  const { user } = useUser();
+  const { user } = useAuth();
   const adminAPI = useAdminAPI();
-  const [wardNumber, setWardNumber] = useState<number>(44);
+  const [wardNumber, setWardNumber] = useState<number>(user?.ward_number ?? 44);
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // TEMPORARY: For testing - always ward 44, but allow changing
-  const role = 'ward_admin'; // Can be changed to 'admin' to allow ward selection
+  useEffect(() => {
+    if (user?.ward_number) {
+      setWardNumber(user.ward_number);
+    }
+  }, [user?.ward_number]);
+
+  const role = user?.role || 'citizen';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,33 +51,33 @@ export default function NotificationBroadcast({ onSuccess }: NotificationBroadca
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6">
+    <div className="bg-white dark:bg-slate-900 rounded-lg shadow-lg p-6 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100">
       <div className="flex items-center gap-2 mb-4">
         <div className="p-2 bg-blue-100 rounded-lg">
           <Send className="w-6 h-6 text-blue-600" />
         </div>
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Ward Notification</h2>
-          <p className="text-sm text-gray-600">Send updates to ward residents</p>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Ward Notification</h2>
+          <p className="text-sm text-slate-600 dark:text-slate-300">Send updates to ward residents</p>
         </div>
       </div>
       
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 flex items-center gap-2">
+        <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-200 px-4 py-3 rounded-lg mb-4 flex items-center gap-2">
           <AlertCircle className="w-5 h-5" />
           {error}
         </div>
       )}
       
       {success && (
-        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-4">
-          ✅ Notification sent successfully to Ward {wardNumber}!
+        <div className="bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-200 px-4 py-3 rounded-lg mb-4">
+          Notification sent successfully to Ward {wardNumber}.
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="ward_number" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="ward_number" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
             Ward Number <span className="text-red-600">*</span>
           </label>
           <input
@@ -83,18 +88,18 @@ export default function NotificationBroadcast({ onSuccess }: NotificationBroadca
             required
             min="1"
             max="272"
-            disabled={role === 'ward_admin'} // Locked for ward admins
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+            disabled={role === 'ward_officer'} // Locked for ward officers
+            className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-100 dark:disabled:bg-slate-800"
           />
-          {role === 'ward_admin' && (
-            <p className="mt-1 text-sm text-gray-500">
-              Ward admins can only broadcast to their assigned ward
+          {role === 'ward_officer' && (
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Ward officers can only broadcast to their assigned ward
             </p>
           )}
         </div>
 
         <div>
-          <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="title" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
             Title <span className="text-red-600">*</span>
           </label>
           <input
@@ -104,14 +109,14 @@ export default function NotificationBroadcast({ onSuccess }: NotificationBroadca
             onChange={(e) => setTitle(e.target.value)}
             required
             maxLength={100}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="e.g., Waterlogging Alert"
           />
-          <p className="mt-1 text-sm text-gray-500">{title.length}/100 characters</p>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{title.length}/100 characters</p>
         </div>
 
         <div>
-          <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="message" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
             Message <span className="text-red-600">*</span>
           </label>
           <textarea
@@ -121,10 +126,10 @@ export default function NotificationBroadcast({ onSuccess }: NotificationBroadca
             required
             rows={5}
             maxLength={500}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Enter notification message..."
           />
-          <p className="mt-1 text-sm text-gray-500">{message.length}/500 characters</p>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{message.length}/500 characters</p>
         </div>
 
         <button

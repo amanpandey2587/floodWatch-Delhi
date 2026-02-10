@@ -100,12 +100,12 @@ export default function SafeParkingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="flex items-start justify-between gap-6 flex-wrap">
           <div>
             <h1 className="text-3xl md:text-4xl font-black">Nearby Safe Parking</h1>
-            <p className="text-slate-400 mt-2">
+            <p className="text-slate-600 dark:text-slate-400 mt-2">
               Find elevated or multi-level parking within a safe radius during flood conditions.
             </p>
           </div>
@@ -118,7 +118,7 @@ export default function SafeParkingPage() {
               Use My Location
             </button>
             <button
-              className="px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-white font-semibold"
+              className="px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-800 dark:text-white border border-slate-300 dark:border-slate-700 font-semibold"
               onClick={fetchAll}
               disabled={loading}
             >
@@ -129,36 +129,36 @@ export default function SafeParkingPage() {
 
         <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
-            <label className="text-xs uppercase tracking-widest text-slate-400">Latitude</label>
+            <label className="text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400">Latitude</label>
             <input
-              className="mt-2 w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100"
+              className="mt-2 w-full rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 px-3 py-2 text-slate-900 dark:text-slate-100"
               value={lat}
               onChange={(e) => setLat(e.target.value)}
               placeholder="28.6139"
             />
           </div>
           <div>
-            <label className="text-xs uppercase tracking-widest text-slate-400">Longitude</label>
+            <label className="text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400">Longitude</label>
             <input
-              className="mt-2 w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100"
+              className="mt-2 w-full rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 px-3 py-2 text-slate-900 dark:text-slate-100"
               value={lon}
               onChange={(e) => setLon(e.target.value)}
               placeholder="77.2090"
             />
           </div>
           <div>
-            <label className="text-xs uppercase tracking-widest text-slate-400">Radius (m)</label>
+            <label className="text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400">Radius (m)</label>
             <input
-              className="mt-2 w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100"
+              className="mt-2 w-full rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 px-3 py-2 text-slate-900 dark:text-slate-100"
               value={radius}
               onChange={(e) => setRadius(e.target.value)}
               placeholder="2000"
             />
           </div>
           <div>
-            <label className="text-xs uppercase tracking-widest text-slate-400">Limit</label>
+            <label className="text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400">Limit</label>
             <input
-              className="mt-2 w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100"
+              className="mt-2 w-full rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 px-3 py-2 text-slate-900 dark:text-slate-100"
               value={limit}
               onChange={(e) => setLimit(e.target.value)}
               placeholder="3"
@@ -168,7 +168,7 @@ export default function SafeParkingPage() {
 
         <div className="mt-6">
           <button
-            className="px-5 py-2 rounded-lg bg-white text-slate-900 font-semibold"
+            className="px-5 py-2 rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-semibold"
             onClick={() => fetchNearby()}
             disabled={loading}
           >
@@ -183,7 +183,7 @@ export default function SafeParkingPage() {
         </div>
 
         {error && (
-          <div className="mt-6 p-4 rounded-lg bg-red-950/50 border border-red-800 text-red-200 flex items-start gap-3">
+          <div className="mt-6 p-4 rounded-lg bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-200 flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 mt-0.5" />
             <span>{error}</span>
           </div>
@@ -192,26 +192,26 @@ export default function SafeParkingPage() {
         <div className="mt-10">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold">Results</h2>
-            {lastSearch && <span className="text-sm text-slate-400">{lastSearch}</span>}
+            {lastSearch && <span className="text-sm text-slate-500 dark:text-slate-400">{lastSearch}</span>}
           </div>
 
           {locations.length === 0 && !loading && !error && (
-            <div className="mt-6 text-slate-400">No locations found. Try a larger radius.</div>
+            <div className="mt-6 text-slate-500 dark:text-slate-400">No locations found. Try a larger radius.</div>
           )}
 
           <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
             {locations.map((loc) => (
-              <div key={loc.id} className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+              <div key={loc.id} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-5">
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="text-lg font-semibold text-white">{loc.name}</h3>
-                    <p className="text-sm text-slate-400">{loc.address}</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">{loc.address}</p>
                   </div>
-                  <span className="text-xs px-2 py-1 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
+                  <span className="text-xs px-2 py-1 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-300 border border-cyan-500/30">
                     {loc.type.replace('_', ' ')}
                   </span>
                 </div>
-                <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-slate-300">
+                <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-slate-600 dark:text-slate-300">
                   <div className="flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-cyan-400" /> Ward {loc.ward_number}
                   </div>
@@ -222,7 +222,7 @@ export default function SafeParkingPage() {
                   <div>Capacity: {loc.capacity}</div>
                   <div>Elevation: {loc.elevation_m} m</div>
                 </div>
-                <div className="mt-3 text-xs text-slate-500">
+                <div className="mt-3 text-xs text-slate-500 dark:text-slate-400">
                   Lat {loc.lat.toFixed(4)}, Lon {loc.lon.toFixed(4)}
                 </div>
               </div>

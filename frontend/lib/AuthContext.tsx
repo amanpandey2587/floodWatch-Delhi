@@ -6,8 +6,9 @@ import axios from 'axios';
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 interface User {
-    id: string;
+    user_id: string;
     email: string;
+    name: string;
     role: string;
     ward_number?: number;
 }
@@ -16,7 +17,7 @@ interface AuthContextType {
     user: User | null;
     token: string | null;
     login: (email: string, password: string) => Promise<void>;
-    register: (email: string, password: string, role?: string, wardNumber?: number) => Promise<void>;
+    register: (name: string, email: string, password: string, role?: string, wardNumber?: number) => Promise<void>;
     logout: () => void;
     isLoading: boolean;
 }
@@ -42,12 +43,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const login = async (email: string, password: string) => {
         try {
+            console.log('[Auth] login -> payload', { email, password: '***' });
             const response = await axios.post(`${API_BASE_URL}/api/auth/login`, {
                 email,
                 password,
             });
 
             const { access_token, user: userData } = response.data;
+            console.log('[Auth] login <- response', { access_token: access_token ? '***' : null, user: userData });
 
             // Store token and user info
             localStorage.setItem('auth_token', access_token);
@@ -62,6 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const register = async (
+        name: string,
         email: string,
         password: string,
         role: string = 'citizen',
@@ -69,6 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     ) => {
         try {
             const payload: any = {
+                name,
                 email,
                 password,
                 role,
@@ -78,9 +83,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 payload.ward_number = wardNumber;
             }
 
+            console.log('[Auth] register -> payload', { ...payload, password: '***' });
             const response = await axios.post(`${API_BASE_URL}/api/auth/register`, payload);
 
             const { access_token, user: userData } = response.data;
+            console.log('[Auth] register <- response', { access_token: access_token ? '***' : null, user: userData });
 
             // Auto-login after registration
             localStorage.setItem('auth_token', access_token);

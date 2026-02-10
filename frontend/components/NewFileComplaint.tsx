@@ -384,24 +384,24 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="bg-white rounded-xl shadow-lg p-8">
-        <h2 className="text-3xl font-bold text-gray-900 mb-2">
+    <div className="max-w-4xl mx-auto text-slate-900 dark:text-slate-100">
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-lg p-8 border border-slate-200 dark:border-slate-800">
+        <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
           File a New Complaint
         </h2>
-        <p className="text-gray-600 mb-8">
+        <p className="text-slate-600 dark:text-slate-300 mb-8">
           Report waterlogging, drainage issues, or other civic problems in your ward
         </p>
 
         {/* Error Alert */}
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div className="mb-6 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-300 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <h3 className="text-sm font-semibold text-red-900 mb-1">
+              <h3 className="text-sm font-semibold text-red-900 dark:text-red-200 mb-1">
                 Error filing complaint
               </h3>
-              <p className="text-sm text-red-700">{error}</p>
+              <p className="text-sm text-red-700 dark:text-red-200">{error}</p>
             </div>
           </div>
         )}
@@ -409,17 +409,17 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
         {/* Success Alert with Verification Summary */}
         {success && complaintId && (
           <div className="mb-6 space-y-4">
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
-              <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+            <div className="bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800 rounded-lg p-4 flex items-start gap-3">
+              <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-300 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <h3 className="text-sm font-semibold text-green-900 mb-1">
+                <h3 className="text-sm font-semibold text-green-900 dark:text-green-200 mb-1">
                   Complaint filed successfully!
                 </h3>
-                <p className="text-sm text-green-700">
+                <p className="text-sm text-green-700 dark:text-green-200">
                   Your complaint ID is:{" "}
                   <span className="font-mono font-semibold">{complaintId}</span>
                 </p>
-                <p className="text-xs text-green-600 mt-1">
+                <p className="text-xs text-green-600 dark:text-green-300 mt-1">
                   Redirecting to tracking page...
                 </p>
               </div>
@@ -427,42 +427,42 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
 
             {/* Verification Summary */}
             {verificationSummary && verificationSummary.total_images > 0 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                 <div className="flex items-start gap-3">
-                  <ShieldCheck className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <ShieldCheck className="w-5 h-5 text-blue-600 dark:text-blue-300 flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <h3 className="text-sm font-semibold text-blue-900 mb-2">
+                    <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-2">
                       AI Verification Complete
                     </h3>
                     <div className="grid grid-cols-2 gap-3 text-sm">
                       <div>
-                        <span className="text-blue-700">Total Images:</span>{" "}
-                        <span className="font-semibold text-blue-900">
+                        <span className="text-blue-700 dark:text-blue-300">Total Images:</span>{" "}
+                        <span className="font-semibold text-blue-900 dark:text-blue-200">
                           {verificationSummary.total_images}
                         </span>
                       </div>
                       <div>
-                        <span className="text-blue-700">Verified:</span>{" "}
-                        <span className="font-semibold text-green-900">
+                        <span className="text-blue-700 dark:text-blue-300">Verified:</span>{" "}
+                        <span className="font-semibold text-green-900 dark:text-green-200">
                           {verificationSummary.verified_count}
                         </span>
                       </div>
                       <div>
-                        <span className="text-blue-700">Confidence:</span>{" "}
-                        <span className="font-semibold text-blue-900">
+                        <span className="text-blue-700 dark:text-blue-300">Confidence:</span>{" "}
+                        <span className="font-semibold text-blue-900 dark:text-blue-200">
                           {verificationSummary.average_confidence}%
                         </span>
                       </div>
                       <div>
-                        <span className="text-blue-700">Verification Rate:</span>{" "}
-                        <span className="font-semibold text-blue-900">
+                        <span className="text-blue-700 dark:text-blue-300">Verification Rate:</span>{" "}
+                        <span className="font-semibold text-blue-900 dark:text-blue-200">
                           {verificationSummary.verification_rate}%
                         </span>
                       </div>
                     </div>
 
                     {verificationSummary.has_critical && (
-                      <div className="mt-2 flex items-center gap-2 text-sm text-red-700">
+                      <div className="mt-2 flex items-center gap-2 text-sm text-red-700 dark:text-red-200">
                         <AlertTriangle className="w-4 h-4" />
                         <span>Critical waterlogging detected in images</span>
                       </div>
@@ -470,7 +470,7 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
 
                     <button
                       onClick={() => setShowVerificationDetails(!showVerificationDetails)}
-                      className="mt-3 text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+                      className="mt-3 text-sm text-blue-600 dark:text-blue-300 hover:text-blue-700 font-medium flex items-center gap-1"
                     >
                       <Eye className="w-4 h-4" />
                       {showVerificationDetails ? "Hide" : "View"} detailed results
@@ -482,8 +482,8 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
 
             {/* Detailed Verification Results */}
             {showVerificationDetails && verificationResults.length > 0 && (
-              <div className="bg-white border border-gray-200 rounded-lg p-4">
-                <h4 className="text-sm font-semibold text-gray-900 mb-3">
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">
                   Verification Results Per Image
                 </h4>
                 <div className="space-y-3">
@@ -714,11 +714,11 @@ export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
             </p>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               {[
-                { value: WaterDepth.ANKLE_DEEP, label: "🦶 Ankle Deep", desc: "<6 inches" },
-                { value: WaterDepth.KNEE_DEEP, label: "🦵 Knee Deep", desc: "6-18 inches" },
-                { value: WaterDepth.TYRE_DEEP, label: "🚗 Tyre Deep", desc: "18-24 inches" },
-                { value: WaterDepth.HOOD_DEEP, label: "🚙 Hood Deep", desc: "24-36 inches" },
-                { value: WaterDepth.FULLY_SUBMERGED, label: "🌊 Submerged", desc: ">36 inches" },
+                { value: WaterDepth.ANKLE_DEEP, label: "Ankle Deep", desc: "<6 inches" },
+                { value: WaterDepth.KNEE_DEEP, label: "Knee Deep", desc: "6-18 inches" },
+                { value: WaterDepth.TYRE_DEEP, label: "Tyre Deep", desc: "18-24 inches" },
+                { value: WaterDepth.HOOD_DEEP, label: "Hood Deep", desc: "24-36 inches" },
+                { value: WaterDepth.FULLY_SUBMERGED, label: "Submerged", desc: ">36 inches" },
               ].map(({ value, label, desc }) => (
                 <button
                   key={value}

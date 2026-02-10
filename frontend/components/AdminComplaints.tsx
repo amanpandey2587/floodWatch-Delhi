@@ -59,11 +59,11 @@ export default function AdminComplaints({ complaints }: AdminComplaintsProps) {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Recent Complaints</h2>
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Recent Complaints</h2>
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
-          className="px-4 py-2 border border-gray-300 rounded-lg"
+          className="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900"
         >
           <option value="all">All Status</option>
           <option value="pending">Pending</option>
@@ -74,53 +74,53 @@ export default function AdminComplaints({ complaints }: AdminComplaintsProps) {
       </div>
 
       {filteredComplaints.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg">
-          <p className="text-gray-600">No complaints found</p>
+        <div className="text-center py-12 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+          <p className="text-slate-600 dark:text-slate-300">No complaints found</p>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+        <div className="bg-white dark:bg-slate-900 rounded-lg shadow overflow-hidden border border-slate-200 dark:border-slate-800">
+          <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
+            <thead className="bg-slate-50 dark:bg-slate-900">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                   ID
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                   Title
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                   Ward
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                   Priority
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                   Created
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                   Action
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white dark:bg-slate-900 divide-y divide-slate-200 dark:divide-slate-800">
               {filteredComplaints.map((complaint) => (
-                <tr key={complaint.complaint_id} className="hover:bg-gray-50">
+                <tr key={complaint.complaint_id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm font-mono text-gray-500">
+                    <span className="text-sm font-mono text-slate-500 dark:text-slate-400">
                       {complaint.complaint_id}
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-sm font-medium text-gray-900">{complaint.title}</div>
-                    <div className="text-sm text-gray-500 truncate max-w-xs">
+                    <div className="text-sm font-medium text-slate-900 dark:text-white">{complaint.title}</div>
+                    <div className="text-sm text-slate-500 dark:text-slate-400 truncate max-w-xs">
                       {complaint.description}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center text-sm text-gray-600">
+                    <div className="flex items-center text-sm text-slate-600 dark:text-slate-300">
                       <MapPin className="w-4 h-4 mr-1" />
                       {complaint.ward_number}
                     </div>
@@ -135,21 +135,21 @@ export default function AdminComplaints({ complaints }: AdminComplaintsProps) {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm text-gray-600 capitalize">{complaint.priority}</span>
+                    <span className="text-sm text-slate-600 dark:text-slate-300 capitalize">{complaint.priority}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center text-sm text-gray-500">
+                    <div className="flex items-center text-sm text-slate-500 dark:text-slate-400">
                       <Clock className="w-4 h-4 mr-1" />
                       {formatDate(complaint.created_at)}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <Link
-                      href={`/complaints/${complaint.complaint_id}`}
-                      className="text-blue-600 hover:text-blue-900 flex items-center gap-1"
+                      href={`/admin/complaints/${complaint.complaint_id}`}
+                      className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-500 flex items-center gap-1"
                     >
                       <Eye className="w-4 h-4" />
-                      View
+                      Manage
                     </Link>
                   </td>
                 </tr>

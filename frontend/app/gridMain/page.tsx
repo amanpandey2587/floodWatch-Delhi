@@ -139,10 +139,10 @@ export default function WaterloggingMap() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center h-screen bg-slate-50 dark:bg-slate-950">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading map data...</p>
+          <p className="text-slate-600 dark:text-slate-300">Loading map data...</p>
         </div>
       </div>
     );
@@ -150,7 +150,7 @@ export default function WaterloggingMap() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center h-screen bg-slate-50 dark:bg-slate-950">
         <div className="text-center text-red-500">
           <p className="text-xl font-bold mb-2">Error</p>
           <p>{error}</p>
@@ -163,7 +163,7 @@ export default function WaterloggingMap() {
     <div className="relative h-screen w-full">
       {/* Stats Panel */}
       {mapData?.stats && (
-        <div className="absolute top-4 left-4 z-[1000] bg-white p-4 rounded-lg shadow-lg">
+        <div className="absolute top-4 left-4 z-[1000] bg-white dark:bg-slate-900 p-4 rounded-lg shadow-lg border border-slate-200 dark:border-slate-800">
           <h2 className="text-lg font-bold mb-2">East Delhi Risk Stats</h2>
           <div className="text-sm space-y-1">
             <p><strong>Total Cells:</strong> {mapData.stats.total_cells}</p>
@@ -185,30 +185,30 @@ export default function WaterloggingMap() {
       )}
 
       {/* Filter Controls */}
-      <div className="absolute top-4 right-4 z-[1000] bg-white p-4 rounded-lg shadow-lg">
+        <div className="absolute top-4 right-4 z-[1000] bg-white dark:bg-slate-900 p-4 rounded-lg shadow-lg border border-slate-200 dark:border-slate-800">
         <h3 className="font-bold mb-2">Filter by Risk</h3>
         <div className="space-y-2">
           <button
             onClick={() => setFilterRisk(0)}
-            className={`w-full px-3 py-1 rounded ${filterRisk === 0 ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+            className={`w-full px-3 py-1 rounded ${filterRisk === 0 ? 'bg-blue-500 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}
           >
             All
           </button>
           <button
             onClick={() => setFilterRisk(0.3)}
-            className={`w-full px-3 py-1 rounded ${filterRisk === 0.3 ? 'bg-yellow-500 text-white' : 'bg-gray-200'}`}
+            className={`w-full px-3 py-1 rounded ${filterRisk === 0.3 ? 'bg-yellow-500 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}
           >
             Medium+
           </button>
           <button
             onClick={() => setFilterRisk(0.5)}
-            className={`w-full px-3 py-1 rounded ${filterRisk === 0.5 ? 'bg-orange-500 text-white' : 'bg-gray-200'}`}
+            className={`w-full px-3 py-1 rounded ${filterRisk === 0.5 ? 'bg-orange-500 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}
           >
             High+
           </button>
           <button
             onClick={() => setFilterRisk(0.7)}
-            className={`w-full px-3 py-1 rounded ${filterRisk === 0.7 ? 'bg-red-500 text-white' : 'bg-gray-200'}`}
+            className={`w-full px-3 py-1 rounded ${filterRisk === 0.7 ? 'bg-red-500 text-white' : 'bg-slate-200 dark:bg-slate-800'}`}
           >
             Critical
           </button>
@@ -216,7 +216,7 @@ export default function WaterloggingMap() {
       </div>
 
       {/* Legend */}
-      <div className="absolute bottom-8 right-4 z-[1000] bg-white p-3 rounded-lg shadow-lg">
+      <div className="absolute bottom-8 right-4 z-[1000] bg-white dark:bg-slate-900 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-800">
         <h3 className="font-bold text-sm mb-2">Risk Level</h3>
         <div className="space-y-1 text-xs">
           <div className="flex items-center">

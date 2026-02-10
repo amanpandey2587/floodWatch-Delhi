@@ -64,6 +64,33 @@ const center = {
 
 const libraries: ("places" | "drawing" | "geometry" | "visualization")[] = ['places', 'visualization']
 
+const toRadians = (deg: number) => (deg * Math.PI) / 180
+
+const haversineMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R = 6371000
+  const dLat = toRadians(lat2 - lat1)
+  const dLon = toRadians(lon2 - lon1)
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return R * c
+}
+
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t
+
+const gradientColor = (distanceM: number) => {
+  const maxDistance = 1200
+  const t = Math.max(0, Math.min(1, 1 - distanceM / maxDistance))
+  const blue = { r: 59, g: 130, b: 246 }
+  const red = { r: 239, g: 68, b: 68 }
+  const r = Math.round(lerp(blue.r, red.r, t))
+  const g = Math.round(lerp(blue.g, red.g, t))
+  const b = Math.round(lerp(blue.b, red.b, t))
+  return `rgb(${r}, ${g}, ${b})`
+}
+
 export default function GoogleMapEnhanced({
   hotspots,
   route,
@@ -259,12 +286,32 @@ export default function GoogleMapEnhanced({
     }
   }
 
-  const routePath = route?.route.map(([lat, lng]) => ({ lat, lng })) || []
   const routeColor = route && route.warnings.length > 0 ? '#ef4444' : '#3b82f6'
+  const riskHotspots = hotspots.filter((h) => h.risk_level > 0)
+  const routeSegments = route && route.route.length > 1
+    ? route.route.slice(0, -1).map((point, idx) => {
+        const next = route.route[idx + 1]
+        const midLat = (point[0] + next[0]) / 2
+        const midLng = (point[1] + next[1]) / 2
+        let nearest = Number.POSITIVE_INFINITY
+        riskHotspots.forEach((h) => {
+          const d = haversineMeters(midLat, midLng, h.lat, h.lng)
+          if (d < nearest) nearest = d
+        })
+        const color = riskHotspots.length > 0 ? gradientColor(nearest) : routeColor
+        return {
+          path: [
+            { lat: point[0], lng: point[1] },
+            { lat: next[0], lng: next[1] },
+          ],
+          color,
+        }
+      })
+    : []
 
   if (loadError) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-gray-100">
+      <div className="w-full h-full flex items-center justify-center bg-slate-50 dark:bg-slate-950">
         <div className="text-center text-red-600">
           <p className="font-semibold">Error loading Google Maps</p>
           <p className="text-sm">Please check your API key and internet connection</p>
@@ -275,10 +322,10 @@ export default function GoogleMapEnhanced({
 
   if (!isLoaded) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-gray-100">
+      <div className="w-full h-full flex items-center justify-center bg-slate-50 dark:bg-slate-950">
         <div className="text-center">
           <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-          <p className="text-gray-600">Loading Google Maps...</p>
+          <p className="text-slate-600 dark:text-slate-300">Loading Google Maps...</p>
         </div>
       </div>
     )
@@ -318,7 +365,7 @@ export default function GoogleMapEnhanced({
             <h3 className="font-bold text-lg mb-1">{selectedHotspot.name}</h3>
             <div className="space-y-1 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-600">Risk Level:</span>
+                <span className="text-slate-600 dark:text-slate-300">Risk Level:</span>
                 <span
                   className={`font-semibold ${
                     selectedHotspot.risk_level === 0
@@ -332,7 +379,7 @@ export default function GoogleMapEnhanced({
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Probability:</span>
+                <span className="text-slate-600 dark:text-slate-300">Probability:</span>
                 <span className="font-semibold">
                   {(selectedHotspot.probability * 100).toFixed(1)}%
                 </span>
@@ -359,10 +406,10 @@ export default function GoogleMapEnhanced({
           onCloseClick={() => setSelectedReport(null)}
         >
           <div className="p-2 min-w-[200px]">
-            <div className="text-sm text-gray-700">
+            <div className="text-sm text-slate-700 dark:text-slate-200">
               <div className="flex items-center gap-2 mb-1">
                 <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-slate-500 dark:text-slate-400">
                   {new Date(selectedReport.timestamp * 1000).toLocaleTimeString()}
                 </span>
               </div>
@@ -373,16 +420,17 @@ export default function GoogleMapEnhanced({
       )}
 
       {/* Route Polyline */}
-      {route && routePath.length > 0 && (
+      {routeSegments.map((segment, idx) => (
         <Polyline
-          path={routePath}
+          key={`route-seg-${idx}`}
+          path={segment.path}
           options={{
-            strokeColor: routeColor,
-            strokeOpacity: 0.8,
-            strokeWeight: 4,
+            strokeColor: segment.color,
+            strokeOpacity: 0.9,
+            strokeWeight: 5,
           }}
         />
-      )}
+      ))}
     </GoogleMap>
   )
 }

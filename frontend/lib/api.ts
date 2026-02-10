@@ -39,7 +39,7 @@ axios.interceptors.response.use(
       if (typeof window !== 'undefined') {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('auth_user');
-        window.location.href = '/login';
+        window.location.href = '/sign-in';
       }
     }
     return Promise.reject(error);
@@ -54,6 +54,8 @@ export function useComplaintAPI() {
 
     return {
       'Content-Type': 'application/json',
+      ...(user?.user_id && { 'X-User-ID': user.user_id }),
+      ...(user?.role && { 'X-User-Role': user.role }),
       ...(token && { Authorization: `Bearer ${token}` }),
     };
   };
@@ -111,7 +113,7 @@ export function useComplaintAPI() {
       const response = await axios.put(
         `${API_BASE_URL}/api/complaints/${complaintId}/assign`,
         { officer_id: officerId },
-        { headers }
+        { headers: { ...headers, 'X-Officer-ID': officerId } }
       );
       return response.data;
     },
@@ -144,6 +146,17 @@ export function useComplaintAPI() {
       const response = await axios.post(
         `${API_BASE_URL}/api/complaints/${complaintId}/timeline`,
         entry,
+        { headers }
+      );
+      return response.data;
+    },
+
+    async setComplaintETA(complaintId: string, etaHours: number, comment?: string) {
+      const headers = getHeaders();
+
+      const response = await axios.put(
+        `${API_BASE_URL}/api/complaints/${complaintId}/eta`,
+        { eta_hours: etaHours, comment },
         { headers }
       );
       return response.data;

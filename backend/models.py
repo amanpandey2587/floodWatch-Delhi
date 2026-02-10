@@ -236,6 +236,11 @@ class UserModel:
     def hash_password(password: str) -> str:
         """Hash a password"""
         from passlib.context import CryptContext
+        # bcrypt only uses first 72 bytes; truncate to avoid errors
+        if password is not None:
+            pw_bytes = str(password).encode("utf-8")
+            if len(pw_bytes) > 72:
+                password = pw_bytes[:72].decode("utf-8", errors="ignore")
         pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
         return pwd_context.hash(password)
     

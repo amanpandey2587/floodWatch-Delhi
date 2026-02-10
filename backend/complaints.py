@@ -44,3 +44,7 @@ class ComplaintUpdate(BaseModel):
 class ComplaintRating(BaseModel):
     rating: int = Field(..., ge=1, le=5)
     feedback: Optional[str] = None
+
+class ComplaintEta(BaseModel):
+    eta_hours: float = Field(..., gt=0, le=168)
+    comment: Optional[str] = None

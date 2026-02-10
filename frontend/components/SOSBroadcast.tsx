@@ -43,14 +43,14 @@ export default function SOSBroadcast({ wards }: SOSBroadcastProps) {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6">
+    <div className="bg-white dark:bg-slate-900 rounded-lg shadow-lg p-6 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100">
       <div className="flex items-center gap-2 mb-4">
         <div className="p-2 bg-red-100 rounded-lg">
           <Radio className="w-6 h-6 text-red-600" />
         </div>
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Emergency Broadcast</h2>
-          <p className="text-sm text-gray-600">Send critical alerts to ward residents</p>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Emergency Broadcast</h2>
+          <p className="text-sm text-slate-600 dark:text-slate-300">Send critical alerts to ward residents</p>
         </div>
       </div>
 
@@ -92,13 +92,13 @@ export default function SOSBroadcast({ wards }: SOSBroadcastProps) {
 
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
             Select Ward <span className="text-red-600">*</span>
           </label>
           <select
             value={selectedWard}
             onChange={(e) => setSelectedWard(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
           >
             <option value="">-- Select a ward --</option>
             {wards.map((ward) => (
@@ -110,7 +110,7 @@ export default function SOSBroadcast({ wards }: SOSBroadcastProps) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
             Emergency Alert Message <span className="text-red-600">*</span>
           </label>
           <textarea
@@ -118,10 +118,10 @@ export default function SOSBroadcast({ wards }: SOSBroadcastProps) {
             onChange={(e) => setMessage(e.target.value)}
             rows={4}
             maxLength={300}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
             placeholder="Enter emergency alert message..."
           />
-          <p className="mt-1 text-sm text-gray-500">{message.length}/300 characters</p>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{message.length}/300 characters</p>
         </div>
 
         <button

@@ -124,3 +124,14 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* Dark mode overrides for legacy gray utilities */
+.dark .bg-gray-50 { background-color: rgb(15 23 42 / 1); }
+.dark .bg-gray-100 { background-color: rgb(30 41 59 / 1); }
+.dark .border-gray-200 { border-color: rgb(51 65 85 / 1); }
+.dark .border-gray-300 { border-color: rgb(71 85 105 / 1); }
+.dark .text-gray-500 { color: rgb(148 163 184 / 1); }
+.dark .text-gray-600 { color: rgb(148 163 184 / 1); }
+.dark .text-gray-700 { color: rgb(203 213 225 / 1); }
+.dark .text-gray-800 { color: rgb(226 232 240 / 1); }
+.dark .text-gray-900 { color: rgb(241 245 249 / 1); }

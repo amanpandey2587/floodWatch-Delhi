@@ -9,6 +9,7 @@ class AuthController:
     def register(user_data: UserRegister):
         """Register new user"""
         try:
+            print(f"[Auth] register -> model: email={user_data.email}, name={user_data.name}, role={user_data.role}, ward_number={user_data.ward_number}")
             # Hash password
             password_hash = UserModel.hash_password(user_data.password)
             
@@ -61,6 +62,7 @@ class AuthController:
     def login(credentials: UserLogin):
         """Login user"""
         try:
+            print(f"[Auth] login -> model: email={credentials.email}")
             # Find user by email
             user = UserModel.find_by_email(credentials.email)
             
