@@ -53,9 +53,6 @@
       "reactCompiler": true
     },
     "config": {
-      "googleMaps": {
-        "apiKey": "AIzaSyAC9-71eVRq6seBK08JFbqeZLt2RVewdY4"
-      }
     }
   }
 }

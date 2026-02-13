@@ -17,3 +17,6 @@ geopandas
 python-jose
 passlib[bcrypt]
 bcrypt<4.0.0
+osmnx
+pydantic[email]
+polyline
