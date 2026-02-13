@@ -26,8 +26,8 @@ def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
 async def get_safe_parking(
     lat: float = Query(..., description="Latitude of current location"),
     lon: float = Query(..., description="Longitude of current location"),
-    radius: int = Query(2000, description="Search radius in meters (default 2km)"),
-    limit: int = Query(3, description="Maximum number of results")
+    radius: int = Query(4000, description="Search radius in meters (default 2km)"),
+    limit: int = Query(4, description="Maximum number of results")
 ):
     """Find nearest safe parking locations within radius"""
     
@@ -71,16 +71,13 @@ async def get_all_parking():
 async def get_recommended_parking(
     lat: float,
     lon: float,
-    radius: int = 3000,
-    limit: int = 3
+    radius: int = 4000,
+    limit: int = 4
 ):
     result = find_best_parking(lat, lon, radius, limit)
 
-    if not result:
-        raise HTTPException(status_code=404, detail="No parking found")
-
+    # Always return 200 with array
     return {
-        "count": len(result),
-        "locations": result
+        "count": len(result) if result else 0,
+        "locations": result if result else []
     }
-

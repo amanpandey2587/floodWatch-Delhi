@@ -19,8 +19,8 @@ export default function SafeParkingPage() {
   const safeParkingAPI = useSafeParkingAPI();
   const [lat, setLat] = useState('');
   const [lon, setLon] = useState('');
-  const [radius, setRadius] = useState('2000');
-  const [limit, setLimit] = useState('3');
+  const [radius, setRadius] = useState('4000');
+  const [limit, setLimit] = useState('4');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [locations, setLocations] = useState<ParkingLocation[]>([]);
@@ -32,6 +32,10 @@ export default function SafeParkingPage() {
   };
 
   const fetchNearby = async (latValue?: number, lonValue?: number) => {
+
+    setError(null);        // ✅ clear previous error
+    setLocations([]);      // optional but clean UX
+
     const latNum = latValue ?? parseNumber(lat);
     const lonNum = lonValue ?? parseNumber(lon);
 
@@ -41,22 +45,25 @@ export default function SafeParkingPage() {
     }
 
     setLoading(true);
-    setError(null);
+
     try {
       const data = await safeParkingAPI.getRecommended({
         lat: latNum,
         lon: lonNum,
-        radius: parseNumber(radius) ?? 2000,
-        limit: parseNumber(limit) ?? 3,
+        radius: parseNumber(radius) ?? 4000,
+        limit: parseNumber(limit) ?? 4,
       });
+
       setLocations(data.locations || []);
       setLastSearch(`Smart recommendation within ${radius}m`);
+
     } catch (err: any) {
       setError(err?.message || 'Failed to load safe parking locations');
     } finally {
       setLoading(false);
     }
   };
+
 
   // const fetchAll = async () => {
   //   setLoading(true);
@@ -149,7 +156,7 @@ export default function SafeParkingPage() {
               className="mt-2 w-full rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 px-3 py-2 text-slate-900 dark:text-slate-100"
               value={radius}
               onChange={(e) => setRadius(e.target.value)}
-              placeholder="5000"
+              placeholder="4000"
             />
           </div>
           <div>

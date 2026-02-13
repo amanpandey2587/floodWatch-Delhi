@@ -2,6 +2,7 @@ import osmnx as ox
 import networkx as nx
 import pandas as pd
 from core.state import state
+import geopandas as gpd
 from shapely.geometry import Point
 
 # Risk penalty in meters
@@ -27,12 +28,23 @@ def find_best_parking(user_lat: float, user_lon: float, radius: int = 3000, limi
     try:
         orig_node = ox.nearest_nodes(G, user_lon, user_lat)
     except Exception:
-        return None
+        return []
     
+    # Create GeoSeries for user point
+    user_gdf = parking_gdf.copy()
     user_point = Point(user_lon, user_lat)
 
-    # Fast approximate distance (Euclidean)
-    parking_gdf["approx_dist"] = parking_gdf.geometry.distance(user_point)
+    # Reproject to UTM (meters)
+    parking_projected = parking_gdf.to_crs(epsg=32643)
+
+    user_projected = gpd.GeoSeries([user_point], crs="EPSG:4326").to_crs(epsg=32643)
+
+    # Compute distance in meters
+    parking_projected["approx_dist"] = parking_projected.geometry.distance(user_projected.iloc[0])
+
+    # Bring approx_dist back
+    parking_gdf["approx_dist"] = parking_projected["approx_dist"]
+
 
     # Filter by radius first
     nearby = parking_gdf[parking_gdf["approx_dist"] <= radius]
