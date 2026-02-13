@@ -10,8 +10,12 @@ import { useAuth } from '@/lib/AuthContext';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'admin' || user?.role === 'ward_officer' || user?.role === 'ward_admin';
+  const { user, isLoading } = useAuth();
+  const role = user?.role;
+  const isAdmin = role === 'admin' || role === 'ward_officer' || role === 'ward_admin';
+  const isCitizen = role === 'citizen';
+  const showAdminTabs = !isLoading && isAdmin;
+  const showCitizenTabs = !isLoading && isCitizen;
 
   return (
     <Tabs
@@ -48,49 +52,58 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <Car size={28} color={color} />,
         }}
       />
-      {!isAdmin && (
-        <>
-          <Tabs.Screen
-            name="report"
-            options={{
-              title: 'Report',
-              tabBarIcon: ({ color }) => <MessageSquare size={28} color={color} />,
-            }}
-          />
-          <Tabs.Screen
-            name="status"
-            options={{
-              title: 'Status',
-              tabBarIcon: ({ color }) => <Activity size={28} color={color} />,
-            }}
-          />
-        </>
-      )}
-      {isAdmin && (
-        <>
-          <Tabs.Screen
-            name="admin"
-            options={{
-              title: 'Admin',
-              tabBarIcon: ({ color }) => <Shield size={26} color={color} />,
-            }}
-          />
-          <Tabs.Screen
-            name="resolve"
-            options={{
-              title: 'Resolve',
-              tabBarIcon: ({ color }) => <ClipboardList size={26} color={color} />,
-            }}
-          />
-          <Tabs.Screen
-            name="social"
-            options={{
-              title: 'Social',
-              tabBarIcon: ({ color }) => <Radar size={26} color={color} />,
-            }}
-          />
-        </>
-      )}
+      <Tabs.Screen
+        name="report"
+        options={{
+          title: 'Report',
+          href: showCitizenTabs ? undefined : null,
+          tabBarIcon: ({ color }) => <MessageSquare size={28} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="status"
+        options={{
+          title: 'Status',
+          href: showCitizenTabs ? undefined : null,
+          tabBarIcon: ({ color }) => <Activity size={28} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="admin"
+        options={{
+          title: 'Admin',
+          href: showAdminTabs ? undefined : null,
+          tabBarIcon: ({ color }) => <Shield size={26} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="social"
+        options={{
+          title: 'Social',
+          href: showAdminTabs ? undefined : null,
+          tabBarIcon: ({ color }) => <Radar size={26} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="resolve"
+        options={{
+          title: 'Resolve',
+          href: showAdminTabs ? undefined : null,
+          tabBarIcon: ({ color }) => <ClipboardList size={26} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="status/[id]"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="resolve/[id]"
+        options={{
+          href: null,
+        }}
+      />
       <Tabs.Screen
         name="explore"
         options={{

@@ -191,7 +191,7 @@ export default function ResolveDetailScreen() {
             placeholderTextColor={isDark ? '#64748b' : '#94a3b8'}
             className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white p-4 rounded-xl"
           />
-          <TouchableOpacity onPress={resolve} className="mt-3 bg-green-600 p-3 rounded-xl items-center">
+          <TouchableOpacity onPress={resolve} className="mt-3 bg-green-600 p-3 rounded-xl items-center mb-6">
             <Text className="text-white font-semibold">Mark Resolved</Text>
           </TouchableOpacity>
         </View>

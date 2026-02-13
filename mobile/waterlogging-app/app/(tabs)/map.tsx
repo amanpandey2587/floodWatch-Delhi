@@ -34,7 +34,7 @@ function WaterloggingMapScreen() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [filterRisk, setFilterRisk] = useState<number>(0.5); // Start with high risk only
-    const [showStats, setShowStats] = useState(true);
+    const [expandedControl, setExpandedControl] = useState<'stats' | 'filter' | 'render' | null>(null);
     const [maxPolygons, setMaxPolygons] = useState<number>(500); // Limit rendering
     const { colorScheme } = useColorScheme();
     const isDark = colorScheme === 'dark';
@@ -81,7 +81,7 @@ function WaterloggingMapScreen() {
     if (error) {
         return (
             <View style={styles.centerContainer}>
-                <Text style={styles.errorTitle}>⚠️ Error</Text>
+                <Text style={styles.errorTitle}>Error</Text>
                 <Text style={styles.errorText}>{error}</Text>
                 <Text style={styles.errorHint}>Make sure your backend is running on {API_BASE_URL}</Text>
             </View>
@@ -95,10 +95,11 @@ function WaterloggingMapScreen() {
             return null;
         }
 
-        // Sort by risk score (highest first) and limit
-        const sortedFeatures = [...mapData.grid.features]
-            .sort((a, b) => (b.properties.risk_score || 0) - (a.properties.risk_score || 0))
-            .slice(0, maxPolygons);
+        // Sort by risk score (highest first) and limit. 36000 means render all available cells.
+        const allFeatures = [...mapData.grid.features].sort(
+            (a, b) => (b.properties.risk_score || 0) - (a.properties.risk_score || 0)
+        );
+        const sortedFeatures = maxPolygons >= 36000 ? allFeatures : allFeatures.slice(0, maxPolygons);
 
         console.log(`Rendering ${sortedFeatures.length} / ${mapData.grid.features.length} grid polygons (top risk areas)`);
 
@@ -242,7 +243,29 @@ function WaterloggingMapScreen() {
                 </Text>
             </View>
 
+            <View style={[styles.mobileControlBar, isDark && { backgroundColor: '#0f172a', borderColor: '#1e293b' }]}>
+                <TouchableOpacity
+                    style={[styles.mobileControlButton, expandedControl === 'stats' && styles.mobileControlButtonActive]}
+                    onPress={() => setExpandedControl(expandedControl === 'stats' ? null : 'stats')}
+                >
+                    <Text style={[styles.mobileControlButtonText, expandedControl === 'stats' && styles.mobileControlButtonTextActive]}>Stats</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.mobileControlButton, expandedControl === 'filter' && styles.mobileControlButtonActive]}
+                    onPress={() => setExpandedControl(expandedControl === 'filter' ? null : 'filter')}
+                >
+                    <Text style={[styles.mobileControlButtonText, expandedControl === 'filter' && styles.mobileControlButtonTextActive]}>Filter</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.mobileControlButton, expandedControl === 'render' && styles.mobileControlButtonActive]}
+                    onPress={() => setExpandedControl(expandedControl === 'render' ? null : 'render')}
+                >
+                    <Text style={[styles.mobileControlButtonText, expandedControl === 'render' && styles.mobileControlButtonTextActive]}>Render</Text>
+                </TouchableOpacity>
+            </View>
+
             {/* Polygon Limit Control */}
+            {expandedControl === 'render' && (
             <View style={[styles.limitControl, isDark && { backgroundColor: '#0f172a' }]}>
                 <Text style={[styles.limitLabel, isDark && { color: '#e2e8f0' }]}>Show: {maxPolygons}</Text>
                 <View style={styles.limitButtons}>
@@ -264,16 +287,23 @@ function WaterloggingMapScreen() {
                     >
                         <Text style={[styles.limitBtnText, isDark && { color: '#94a3b8' }, maxPolygons === 1000 && styles.limitBtnTextActive]}>1K</Text>
                     </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.limitBtn, isDark && { backgroundColor: '#1e293b' }, maxPolygons === 36000 && styles.limitBtnActive]}
+                        onPress={() => setMaxPolygons(36000)}
+                    >
+                        <Text style={[styles.limitBtnText, isDark && { color: '#94a3b8' }, maxPolygons === 36000 && styles.limitBtnTextActive]}>36K</Text>
+                    </TouchableOpacity>
                 </View>
             </View>
+            )}
 
             {/* Stats Panel - Collapsible */}
-            {showStats && mapData?.stats && (
+            {expandedControl === 'stats' && mapData?.stats && (
                 <View style={[styles.floatingStatsPanel, isDark && { backgroundColor: '#0f172a' }]}>
                     <View style={styles.statsPanelHeader}>
-                        <Text style={[styles.statsPanelTitle, isDark && { color: 'white' }]}>📊 Risk Stats</Text>
-                        <TouchableOpacity onPress={() => setShowStats(false)}>
-                            <Text style={styles.closeButton}>✕</Text>
+                        <Text style={[styles.statsPanelTitle, isDark && { color: 'white' }]}>Risk Stats</Text>
+                        <TouchableOpacity onPress={() => setExpandedControl(null)}>
+                            <Text style={styles.closeButton}>X</Text>
                         </TouchableOpacity>
                     </View>
                     <View style={styles.miniStatsGrid}>
@@ -293,55 +323,49 @@ function WaterloggingMapScreen() {
                 </View>
             )}
 
-            {/* Show Stats Button */}
-            {!showStats && (
-                <TouchableOpacity
-                    style={[styles.showStatsButton, isDark && { backgroundColor: '#0f172a' }]}
-                    onPress={() => setShowStats(true)}
-                >
-                    <Text style={styles.showStatsButtonText}>📊</Text>
-                </TouchableOpacity>
-            )}
+            {/* Show Stats Button removed; using accordion control buttons above */}
 
             {/* Filter Controls */}
-            <View style={[styles.floatingFilterPanel, isDark && { backgroundColor: '#0f172a' }]}>
-                <Text style={[styles.filterPanelTitle, isDark && { color: 'white' }]}>Filter</Text>
-                <View style={styles.filterButtonsCompact}>
-                    <TouchableOpacity
-                        style={[styles.filterBtnCompact, isDark && { backgroundColor: '#1e293b' }, filterRisk === 0 && styles.filterBtnCompactActive]}
-                        onPress={() => setFilterRisk(0)}
-                    >
-                        <Text style={[styles.filterBtnCompactText, isDark && { color: '#94a3b8' }, filterRisk === 0 && styles.filterBtnCompactTextActive]}>
-                            All
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.filterBtnCompact, isDark && { backgroundColor: '#1e293b' }, filterRisk === 0.3 && styles.filterBtnCompactActive]}
-                        onPress={() => setFilterRisk(0.3)}
-                    >
-                        <Text style={[styles.filterBtnCompactText, isDark && { color: '#94a3b8' }, filterRisk === 0.3 && styles.filterBtnCompactTextActive]}>
-                            Med+
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.filterBtnCompact, isDark && { backgroundColor: '#1e293b' }, filterRisk === 0.5 && styles.filterBtnCompactActive]}
-                        onPress={() => setFilterRisk(0.5)}
-                    >
-                        <Text style={[styles.filterBtnCompactText, isDark && { color: '#94a3b8' }, filterRisk === 0.5 && styles.filterBtnCompactTextActive]}>
-                            High+
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.filterBtnCompact, isDark && { backgroundColor: '#1e293b' }, filterRisk === 0.7 && styles.filterBtnCompactActive]}
-                        onPress={() => setFilterRisk(0.7)}
-                    >
-                        <Text style={[styles.filterBtnCompactText, isDark && { color: '#94a3b8' }, filterRisk === 0.7 && styles.filterBtnCompactTextActive]}>
-                            Crit
-                        </Text>
-                    </TouchableOpacity>
+            {expandedControl === 'filter' && (
+                <View style={[styles.floatingFilterPanel, isDark && { backgroundColor: '#0f172a' }]}>
+                    <Text style={[styles.filterPanelTitle, isDark && { color: 'white' }]}>Filter</Text>
+                    <View style={styles.filterButtonsCompact}>
+                        <TouchableOpacity
+                            style={[styles.filterBtnCompact, isDark && { backgroundColor: '#1e293b' }, filterRisk === 0 && styles.filterBtnCompactActive]}
+                            onPress={() => setFilterRisk(0)}
+                        >
+                            <Text style={[styles.filterBtnCompactText, isDark && { color: '#94a3b8' }, filterRisk === 0 && styles.filterBtnCompactTextActive]}>
+                                All
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.filterBtnCompact, isDark && { backgroundColor: '#1e293b' }, filterRisk === 0.3 && styles.filterBtnCompactActive]}
+                            onPress={() => setFilterRisk(0.3)}
+                        >
+                            <Text style={[styles.filterBtnCompactText, isDark && { color: '#94a3b8' }, filterRisk === 0.3 && styles.filterBtnCompactTextActive]}>
+                                Med+
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.filterBtnCompact, isDark && { backgroundColor: '#1e293b' }, filterRisk === 0.5 && styles.filterBtnCompactActive]}
+                            onPress={() => setFilterRisk(0.5)}
+                        >
+                            <Text style={[styles.filterBtnCompactText, isDark && { color: '#94a3b8' }, filterRisk === 0.5 && styles.filterBtnCompactTextActive]}>
+                                High+
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.filterBtnCompact, isDark && { backgroundColor: '#1e293b' }, filterRisk === 0.7 && styles.filterBtnCompactActive]}
+                            onPress={() => setFilterRisk(0.7)}
+                        >
+                            <Text style={[styles.filterBtnCompactText, isDark && { color: '#94a3b8' }, filterRisk === 0.7 && styles.filterBtnCompactTextActive]}>
+                                Crit
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                    <Text style={styles.filterHint}>Filters on backend</Text>
                 </View>
-                <Text style={styles.filterHint}>⚠️ Filters on backend</Text>
-            </View>
+            )}
 
             {/* Legend */}
             <View style={styles.floatingLegend}>
@@ -372,6 +396,8 @@ function RoutePlanningScreen() {
     const [startQuery, setStartQuery] = useState('Connaught Place');
     const [endQuery, setEndQuery] = useState('India Gate');
     const [profile, setProfile] = useState('driving');
+    const [isRouteControlsExpanded, setIsRouteControlsExpanded] = useState(false);
+    const [isModeDropdownOpen, setIsModeDropdownOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [routeInfo, setRouteInfo] = useState<any>(null);
@@ -471,75 +497,110 @@ function RoutePlanningScreen() {
                 {renderRoute()}
             </MapView>
 
-            {/* Top Search Bar - Google Maps Style */}
-            <View style={[styles.topSearchContainer, isDark && { backgroundColor: '#0f172a' }]}>
-                <View style={styles.searchInputsWrapper}>
-                    {/* Start Input */}
-                    <View style={styles.inputRow}>
-                        <Text style={styles.inputIcon}>�</Text>
-                        <TextInput
-                            style={[styles.searchInput, isDark && { backgroundColor: '#1e293b', color: 'white' }]}
-                            placeholder="Your location"
-                            value={startQuery}
-                            onChangeText={setStartQuery}
-                            placeholderTextColor={isDark ? "#64748b" : "#9ca3af"}
-                        />
-                    </View>
-
-                    {/* Swap Button */}
-                    <TouchableOpacity
-                        style={styles.swapButton}
-                        onPress={() => {
-                            const temp = startQuery;
-                            setStartQuery(endQuery);
-                            setEndQuery(temp);
-                        }}
-                    >
-                        <Text style={styles.swapIcon}>⇅</Text>
-                    </TouchableOpacity>
-
-                    {/* End Input */}
-                    <View style={styles.inputRow}>
-                        <Text style={styles.inputIcon}>🔴</Text>
-                        <TextInput
-                            style={[styles.searchInput, isDark && { backgroundColor: '#1e293b', color: 'white' }]}
-                            placeholder="Choose destination"
-                            value={endQuery}
-                            onChangeText={setEndQuery}
-                            placeholderTextColor={isDark ? "#64748b" : "#9ca3af"}
-                        />
-                    </View>
-                </View>
-
-                {/* Mode Selection */}
-                <View style={styles.modeSelector}>
-                    {['driving', 'walking', 'cycling'].map((mode) => (
-                        <TouchableOpacity
-                            key={mode}
-                            style={[styles.modeButton, profile === mode && styles.modeButtonActive]}
-                            onPress={() => setProfile(mode)}
-                        >
-                            <Text style={[styles.modeIcon, profile === mode && styles.modeIconActive]}>
-                                {mode === 'driving' ? '🚗' : mode === 'walking' ? '🚶' : '🚴'}
-                            </Text>
-                            <Text style={[styles.modeLabel, isDark && { color: '#94a3b8' }, profile === mode && styles.modeLabelActive]}>
-                                {mode === 'driving' ? 'Drive' : mode === 'walking' ? 'Walk' : 'Bike'}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-
-                {/* Search Button */}
+            <View style={[styles.mobileControlBar, isDark && { backgroundColor: '#0f172a', borderColor: '#1e293b' }]}>
                 <TouchableOpacity
-                    style={[styles.searchRouteButton, loading && styles.btnDisabled]}
-                    onPress={handleCalculateRoute}
-                    disabled={loading}
+                    style={[styles.mobileControlButton, isRouteControlsExpanded && styles.mobileControlButtonActive]}
+                    onPress={() => setIsRouteControlsExpanded((prev) => !prev)}
                 >
-                    <Text style={styles.searchRouteButtonText}>
-                        {loading ? '⏳ Searching...' : '🔍 Search'}
+                    <Text style={[styles.mobileControlButtonText, isRouteControlsExpanded && styles.mobileControlButtonTextActive]}>
+                        Route
                     </Text>
                 </TouchableOpacity>
             </View>
+
+            {/* Top Search Bar - Collapsible */}
+            {isRouteControlsExpanded && (
+                <View style={[styles.topSearchContainer, isDark && { backgroundColor: '#0f172a' }]}>
+                    <View style={styles.statsPanelHeader}>
+                        <Text style={[styles.routePanelTitle, isDark && { color: 'white' }]}>Route Planner</Text>
+                        <TouchableOpacity onPress={() => setIsRouteControlsExpanded(false)}>
+                            <Text style={styles.closeButton}>X</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.searchInputsWrapper}>
+                        {/* Start Input */}
+                        <View style={styles.inputRow}>
+                            <Text style={styles.inputIconLabel}>From</Text>
+                            <TextInput
+                                style={[styles.searchInput, isDark && { backgroundColor: '#1e293b', color: 'white' }]}
+                                placeholder="Your location"
+                                value={startQuery}
+                                onChangeText={setStartQuery}
+                                placeholderTextColor={isDark ? "#64748b" : "#9ca3af"}
+                            />
+                        </View>
+
+                        {/* Swap Button */}
+                        <TouchableOpacity
+                            style={styles.swapButton}
+                            onPress={() => {
+                                const temp = startQuery;
+                                setStartQuery(endQuery);
+                                setEndQuery(temp);
+                            }}
+                        >
+                            <Text style={styles.swapIcon}>Swap</Text>
+                        </TouchableOpacity>
+
+                        {/* End Input */}
+                        <View style={styles.inputRow}>
+                            <Text style={styles.inputIconLabel}>To</Text>
+                            <TextInput
+                                style={[styles.searchInput, isDark && { backgroundColor: '#1e293b', color: 'white' }]}
+                                placeholder="Choose destination"
+                                value={endQuery}
+                                onChangeText={setEndQuery}
+                                placeholderTextColor={isDark ? "#64748b" : "#9ca3af"}
+                            />
+                        </View>
+                    </View>
+
+                    {/* Mode Selection Dropdown */}
+                    <View style={styles.modeDropdownContainer}>
+                        <TouchableOpacity
+                            style={[styles.modeDropdownButton, isDark && { backgroundColor: '#1e293b', borderColor: '#334155' }]}
+                            onPress={() => setIsModeDropdownOpen((prev) => !prev)}
+                        >
+                            <Text style={[styles.modeDropdownText, isDark && { color: '#e2e8f0' }]}>
+                                Mode: {profile.charAt(0).toUpperCase() + profile.slice(1)}
+                            </Text>
+                            <Text style={[styles.modeDropdownChevron, isDark && { color: '#94a3b8' }]}>
+                                {isModeDropdownOpen ? '^' : 'v'}
+                            </Text>
+                        </TouchableOpacity>
+                        {isModeDropdownOpen && (
+                            <View style={[styles.modeDropdownMenu, isDark && { backgroundColor: '#0f172a', borderColor: '#334155' }]}>
+                                {['driving', 'walking', 'cycling'].map((mode) => (
+                                    <TouchableOpacity
+                                        key={mode}
+                                        style={[styles.modeDropdownItem, profile === mode && styles.modeDropdownItemActive]}
+                                        onPress={() => {
+                                            setProfile(mode);
+                                            setIsModeDropdownOpen(false);
+                                        }}
+                                    >
+                                        <Text style={[styles.modeDropdownItemText, profile === mode && styles.modeDropdownItemTextActive]}>
+                                            {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        )}
+                    </View>
+
+                    {/* Search Button */}
+                    <TouchableOpacity
+                        style={[styles.searchRouteButton, loading && styles.btnDisabled]}
+                        onPress={handleCalculateRoute}
+                        disabled={loading}
+                    >
+                        <Text style={styles.searchRouteButtonText}>
+                            {loading ? 'Searching...' : 'Search Route'}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            )}
 
             {/* Bottom Sheet - Route Details */}
             {routeInfo ? (
@@ -561,7 +622,7 @@ function RoutePlanningScreen() {
                     {routeInfo.risk_analysis.warning_count > 0 && (
                         <View style={styles.warningBanner}>
                             <Text style={styles.warningBannerText}>
-                                ⚠️ Route passes through {routeInfo.risk_analysis.warning_count} high-risk area(s)
+                                Route passes through {routeInfo.risk_analysis.warning_count} high-risk area(s)
                             </Text>
                         </View>
                     )}
@@ -573,7 +634,6 @@ function RoutePlanningScreen() {
             ) : error ? (
                 <View style={[styles.bottomSheet, isDark && { backgroundColor: '#0f172a' }]}>
                     <View style={styles.errorContainer}>
-                        <Text style={styles.errorIcon}>⚠️</Text>
                         <Text style={[styles.errorMessage, isDark && { color: '#fca5a5' }]}>{error}</Text>
                     </View>
                 </View>
@@ -600,7 +660,7 @@ export default function MapTabScreen() {
                     onPress={() => setCurrentScreen(SCREENS.MAP)}
                 >
                     <Text style={[styles.tabText, currentScreen === SCREENS.MAP && styles.tabTextActive, isDark && { color: '#94a3b8' }, isDark && currentScreen === SCREENS.MAP && { color: '#38bdf8' }]}>
-                        🗺️ Risk Map
+                        Risk Map
                     </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -608,7 +668,7 @@ export default function MapTabScreen() {
                     onPress={() => setCurrentScreen(SCREENS.ROUTE)}
                 >
                     <Text style={[styles.tabText, currentScreen === SCREENS.ROUTE && styles.tabTextActive, isDark && { color: '#94a3b8' }, isDark && currentScreen === SCREENS.ROUTE && { color: '#38bdf8' }]}>
-                        🚗 Routes
+                        Routes
                     </Text>
                 </TouchableOpacity>
             </View>
@@ -700,9 +760,43 @@ const styles = StyleSheet.create({
         fontSize: 12,
         marginTop: 8,
     },
-    floatingStatsPanel: {
+    mobileControlBar: {
         position: 'absolute',
         top: 16,
+        right: 16,
+        flexDirection: 'row',
+        gap: 6,
+        backgroundColor: 'white',
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+        padding: 6,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 5,
+    },
+    mobileControlButton: {
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+        backgroundColor: '#e5e7eb',
+    },
+    mobileControlButtonActive: {
+        backgroundColor: '#3b82f6',
+    },
+    mobileControlButtonText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#1f2937',
+    },
+    mobileControlButtonTextActive: {
+        color: 'white',
+    },
+    floatingStatsPanel: {
+        position: 'absolute',
+        top: 58,
         left: 16,
         backgroundColor: 'white',
         borderRadius: 12,
@@ -765,7 +859,7 @@ const styles = StyleSheet.create({
     },
     floatingFilterPanel: {
         position: 'absolute',
-        top: 16,
+        top: 58,
         right: 16,
         backgroundColor: 'white',
         borderRadius: 12,
@@ -993,7 +1087,7 @@ const styles = StyleSheet.create({
     routePanelTitle: {
         fontSize: 16,
         fontWeight: 'bold',
-        marginBottom: 12,
+        marginBottom: 0,
         color: '#1f2937',
     },
     debugInfo: {
@@ -1058,7 +1152,7 @@ const styles = StyleSheet.create({
     // Google Maps-Style Navigation UI
     topSearchContainer: {
         position: 'absolute',
-        top: 16,
+        top: 58,
         left: 16,
         right: 16,
         backgroundColor: 'white',
@@ -1079,9 +1173,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 8,
     },
-    inputIcon: {
-        fontSize: 16,
-        marginRight: 12,
+    inputIconLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#334155',
+        width: 40,
     },
     searchInput: {
         flex: 1,
@@ -1096,9 +1192,9 @@ const styles = StyleSheet.create({
         right: 12,
         top: 28,
         backgroundColor: 'white',
-        borderRadius: 20,
-        width: 32,
-        height: 32,
+        borderRadius: 14,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 1,
@@ -1106,48 +1202,57 @@ const styles = StyleSheet.create({
         zIndex: 2,
     },
     swapIcon: {
-        fontSize: 18,
+        fontSize: 11,
+        fontWeight: '700',
         color: '#3b82f6',
     },
-    modeSelector: {
-        flexDirection: 'row',
-        backgroundColor: '#f3f4f6',
-        borderRadius: 8,
-        padding: 4,
+    modeDropdownContainer: {
         marginBottom: 12,
     },
-    modeButton: {
-        flex: 1,
+    modeDropdownButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 8,
+        justifyContent: 'space-between',
+        backgroundColor: '#f3f4f6',
+        borderRadius: 8,
         paddingHorizontal: 12,
-        borderRadius: 6,
-        gap: 6,
+        paddingVertical: 10,
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
     },
-    modeButtonActive: {
-        backgroundColor: 'white',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
-    },
-    modeIcon: {
-        fontSize: 18,
-    },
-    modeIconActive: {
-        fontSize: 18,
-    },
-    modeLabel: {
+    modeDropdownText: {
         fontSize: 13,
-        color: '#6b7280',
+        fontWeight: '600',
+        color: '#334155',
+    },
+    modeDropdownChevron: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#64748b',
+    },
+    modeDropdownMenu: {
+        marginTop: 6,
+        backgroundColor: 'white',
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+        borderRadius: 8,
+        overflow: 'hidden',
+    },
+    modeDropdownItem: {
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+    },
+    modeDropdownItemActive: {
+        backgroundColor: '#dbeafe',
+    },
+    modeDropdownItemText: {
+        fontSize: 13,
+        color: '#334155',
         fontWeight: '500',
     },
-    modeLabelActive: {
+    modeDropdownItemTextActive: {
         color: '#3b82f6',
-        fontWeight: '600',
+        fontWeight: '700',
     },
     searchRouteButton: {
         backgroundColor: '#3b82f6',
@@ -1236,3 +1341,8 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
 }); 
+
+
+
+
+

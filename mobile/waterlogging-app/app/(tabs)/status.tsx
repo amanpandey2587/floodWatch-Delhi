@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Clock, AlertCircle, CheckCircle, XCircle, MapPin, Loader, RefreshCw } from 'lucide-react-native';
@@ -18,6 +18,16 @@ interface Complaint {
     priority: string;
     created_at: string;
     water_depth?: string;
+    user_id?: string;
+    created_by?: string;
+    reported_by?: string;
+    created_by_user_id?: string;
+    citizen_id?: string;
+    reported_by_id?: string;
+    user?: {
+        user_id?: string;
+        id?: string;
+    };
     sla_info?: {
         elapsed_hours: number;
         remaining_hours: number;
@@ -33,8 +43,21 @@ export default function StatusScreen() {
     const [error, setError] = useState<string | null>(null);
     const { colorScheme } = useColorScheme();
     const isDark = colorScheme === 'dark';
-    const { authHeaders } = useAuth();
+    const { authHeaders, user } = useAuth();
     const router = useRouter();
+
+    const getComplaintOwnerId = (complaint: Complaint) => {
+        return (
+            complaint.user_id ||
+            complaint.created_by ||
+            complaint.reported_by ||
+            complaint.created_by_user_id ||
+            complaint.citizen_id ||
+            complaint.reported_by_id ||
+            complaint.user?.user_id ||
+            complaint.user?.id
+        );
+    };
 
     const fetchComplaints = async () => {
         try {
@@ -47,12 +70,21 @@ export default function StatusScreen() {
             }
 
             const data = await response.json();
-            // Assuming backend returns all complaints, we might want to filter client side if backend doesn't filter by user
-            // For now, showing all or whatever the API returns. 
-            // Ideally pass header 'Authorization': `Bearer ${token}` to filter by user on backend.
+            const list: Complaint[] = data.complaints || data || [];
+            const currentUserId = user?.user_id;
 
-            const list = data.complaints || data || [];
-            setComplaints(list);
+            if (!currentUserId) {
+                setComplaints([]);
+                setError('User session not found');
+                return;
+            }
+
+            const filteredComplaints = list.filter((complaint) => {
+                const ownerId = getComplaintOwnerId(complaint);
+                return ownerId ? String(ownerId) === String(currentUserId) : false;
+            });
+
+            setComplaints(filteredComplaints);
             setError(null);
         } catch (err: any) {
             console.error('Fetch error:', err);
@@ -65,12 +97,12 @@ export default function StatusScreen() {
 
     useEffect(() => {
         fetchComplaints();
-    }, []);
+    }, [user?.user_id]);
 
     const onRefresh = React.useCallback(() => {
         setRefreshing(true);
         fetchComplaints();
-    }, []);
+    }, [user?.user_id]);
 
     const getStatusColor = (status: string) => {
         switch (status) {
@@ -118,9 +150,9 @@ export default function StatusScreen() {
 
         const getSLAColor = (status: string) => {
             switch (status) {
-                case 'within_sla': return '#22c55e'; // Green
-                case 'approaching_sla': return '#eab308'; // Yellow
-                case 'sla_breached': return '#ef4444'; // Red
+                case 'within_sla': return '#22c55e';
+                case 'approaching_sla': return '#eab308';
+                case 'sla_breached': return '#ef4444';
                 default: return '#6b7280';
             }
         };
@@ -145,17 +177,16 @@ export default function StatusScreen() {
 
                 <View className="flex-row items-center gap-4 border-t border-gray-100 dark:border-slate-800/50 pt-3">
                     <View className="flex-row items-center gap-1">
-                        <MapPin size={12} color={isDark ? "#64748b" : "#94a3b8"} />
+                        <MapPin size={12} color={isDark ? '#64748b' : '#94a3b8'} />
                         <Text className="text-gray-500 dark:text-slate-500 text-xs">Ward {item.ward_number}</Text>
                     </View>
                     <View className="flex-row items-center gap-1">
-                        <Clock size={12} color={isDark ? "#64748b" : "#94a3b8"} />
+                        <Clock size={12} color={isDark ? '#64748b' : '#94a3b8'} />
                         <Text className="text-gray-500 dark:text-slate-500 text-xs">{formatDate(item.created_at)}</Text>
                     </View>
                     <Text className="text-gray-500 dark:text-slate-500 text-xs bg-gray-100 dark:bg-slate-800 px-2 py-0.5 rounded capitalize">{item.category}</Text>
                 </View>
 
-                {/* SLA Tracking */}
                 {item.sla_info && (
                     <View className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-800">
                         <View className="flex-row items-center justify-between">
@@ -169,7 +200,7 @@ export default function StatusScreen() {
                                 <Text className="text-xs font-bold mr-1" style={{ color: getSLAColor(item.sla_info.sla_status) }}>
                                     {item.status !== 'resolved'
                                         ? `${item.sla_info.remaining_hours.toFixed(0)}h remaining`
-                                        : item.sla_info.sla_status === 'met' ? 'SLA Met ✓' : 'SLA Breached'
+                                        : item.sla_info.sla_status === 'met' ? 'SLA Met' : 'SLA Breached'
                                     }
                                 </Text>
                             </View>
@@ -186,7 +217,6 @@ export default function StatusScreen() {
                     </View>
                 )}
 
-                {/* Water Depth Marker */}
                 {item.water_depth && (
                     <View className="mt-2 flex-row items-center">
                         <Text className="text-xs text-gray-500 dark:text-slate-400 mr-2">Water:</Text>
@@ -195,7 +225,7 @@ export default function StatusScreen() {
                 )}
             </TouchableOpacity>
         );
-    }
+    };
 
     return (
         <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
