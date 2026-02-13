@@ -175,9 +175,24 @@ export function useSafeParkingAPI() {
       return response.data;
     },
 
-    async getAll() {
+    async geocode(query: string) {
       const response = await axios.get(
-        `${API_BASE_URL}/api/safe-parking/all`
+        `${API_BASE_URL}/api/geocode`,
+        { params: { query } }
+      );
+      return response.data;
+    },
+
+    async getRoute(params: {
+      start_lat: number;
+      start_lon: number;
+      end_lat: number;
+      end_lon: number;
+      profile?: string;
+    }) {
+      const response = await axios.get(
+        `${API_BASE_URL}/api/route`,
+        { params }
       );
       return response.data;
     },

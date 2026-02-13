@@ -62,7 +62,7 @@ const center = {
   lng: 77.2090
 }
 
-const libraries: ("places" | "drawing" | "geometry" | "visualization")[] = ['places', 'visualization']
+//const libraries: ("places" | "drawing" | "geometry" | "visualization")[] = ['places', 'visualization']
 
 const toRadians = (deg: number) => (deg * Math.PI) / 180
 
@@ -104,9 +104,11 @@ export default function GoogleMapEnhanced({
   onMapModeChange,
 }: GoogleMapEnhancedProps) {
   const { isLoaded, loadError } = useJsApiLoader({
-    id: 'google-map-script',
+    id: 'google-map-script', // MUST be same everywhere
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
-    libraries,
+    libraries: ['places', 'visualization'], // include ALL needed libs
+    language: 'en',
+    region: 'US',
   })
 
   const [map, setMap] = useState<google.maps.Map | null>(null)
@@ -186,7 +188,7 @@ export default function GoogleMapEnhanced({
       }))
 
       const color = getWardColor(ward.preparedness_score)
-      
+
       const polygon = new google.maps.Polygon({
         paths,
         strokeColor: color,
@@ -248,7 +250,7 @@ export default function GoogleMapEnhanced({
   const getMarkerIcon = (riskLevel: number) => {
     const colors = ['#10b981', '#f59e0b', '#ef4444']
     const color = colors[riskLevel] || colors[0]
-    
+
     return {
       path: google.maps.SymbolPath.CIRCLE,
       fillColor: color,
@@ -262,7 +264,7 @@ export default function GoogleMapEnhanced({
   const getCrowdsourceIcon = (severity: number) => {
     const colors = ['#3b82f6', '#f59e0b', '#ef4444']
     const color = colors[severity] || colors[0]
-    
+
     return {
       path: google.maps.SymbolPath.CIRCLE,
       fillColor: color,
@@ -290,23 +292,23 @@ export default function GoogleMapEnhanced({
   const riskHotspots = hotspots.filter((h) => h.risk_level > 0)
   const routeSegments = route && route.route.length > 1
     ? route.route.slice(0, -1).map((point, idx) => {
-        const next = route.route[idx + 1]
-        const midLat = (point[0] + next[0]) / 2
-        const midLng = (point[1] + next[1]) / 2
-        let nearest = Number.POSITIVE_INFINITY
-        riskHotspots.forEach((h) => {
-          const d = haversineMeters(midLat, midLng, h.lat, h.lng)
-          if (d < nearest) nearest = d
-        })
-        const color = riskHotspots.length > 0 ? gradientColor(nearest) : routeColor
-        return {
-          path: [
-            { lat: point[0], lng: point[1] },
-            { lat: next[0], lng: next[1] },
-          ],
-          color,
-        }
+      const next = route.route[idx + 1]
+      const midLat = (point[0] + next[0]) / 2
+      const midLng = (point[1] + next[1]) / 2
+      let nearest = Number.POSITIVE_INFINITY
+      riskHotspots.forEach((h) => {
+        const d = haversineMeters(midLat, midLng, h.lat, h.lng)
+        if (d < nearest) nearest = d
       })
+      const color = riskHotspots.length > 0 ? gradientColor(nearest) : routeColor
+      return {
+        path: [
+          { lat: point[0], lng: point[1] },
+          { lat: next[0], lng: next[1] },
+        ],
+        color,
+      }
+    })
     : []
 
   if (loadError) {
@@ -367,13 +369,12 @@ export default function GoogleMapEnhanced({
               <div className="flex justify-between">
                 <span className="text-slate-600 dark:text-slate-300">Risk Level:</span>
                 <span
-                  className={`font-semibold ${
-                    selectedHotspot.risk_level === 0
+                  className={`font-semibold ${selectedHotspot.risk_level === 0
                       ? 'text-green-600'
                       : selectedHotspot.risk_level === 1
-                      ? 'text-orange-600'
-                      : 'text-red-600'
-                  }`}
+                        ? 'text-orange-600'
+                        : 'text-red-600'
+                    }`}
                 >
                   {getRiskLabel(selectedHotspot.risk_level)}
                 </span>
