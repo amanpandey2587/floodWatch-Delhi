@@ -3,6 +3,7 @@ import joblib
 import geopandas as gpd
 import json
 import os
+import osmnx as ox
 from .config import DATA_DIR, MODEL_PATH
 
 class AppState:
@@ -11,6 +12,9 @@ class AppState:
     drains_data: Optional[Dict[str, Any]] = None
     grid_gdf: Optional[gpd.GeoDataFrame] = None
     model: Any = None
+        # Safe Parking
+    road_graph: Any = None
+    safe_parking_gdf: Optional[gpd.GeoDataFrame] = None
 
     @classmethod
     def load_data(cls):
@@ -43,6 +47,31 @@ class AppState:
         else:
             print(f"Model file not found at {MODEL_PATH}. Using dummy logic.")
         
+        # ----------------------------
+        # Load Safe Parking Resources
+        # ----------------------------
+        try:
+            print("Loading Delhi road network (OSM)...")
+            cls.road_graph = ox.graph_from_place("Delhi, India", network_type="drive")
+            #cls.road_graph = ox.add_edge_lengths(cls.road_graph)
+
+            print("Loading safe parking GeoJSON...")
+            parking_path = DATA_DIR / "delhi_parking_safe_recommended.geojson"
+            if parking_path.exists():
+                cls.safe_parking_gdf = gpd.read_file(parking_path)
+
+                # Keep only low + moderate
+                cls.safe_parking_gdf = cls.safe_parking_gdf[
+                    cls.safe_parking_gdf["risk_category"].str.lower().isin(["low", "moderate"])
+                ]
+
+                print(f"✓ Loaded {len(cls.safe_parking_gdf)} safe parking locations")
+            else:
+                print("Safe parking GeoJSON not found")
+
+        except Exception as e:
+            print(f"Error loading safe parking resources: {e}")
+
         print("✓ Data ready to serve")
 
 state = AppState()

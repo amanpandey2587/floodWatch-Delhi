@@ -1,7 +1,10 @@
 from fastapi import APIRouter, Query
+from fastapi import HTTPException
+from safe_parking_recommendation import find_best_parking
 from typing import Optional, List
 from safe_parking_data import SAFE_PARKING_LOCATIONS
 import math
+
 
 router = APIRouter(prefix="/api/safe-parking", tags=["Safe Parking"])
 
@@ -63,3 +66,21 @@ async def get_all_parking():
         "count": len(SAFE_PARKING_LOCATIONS),
         "locations": SAFE_PARKING_LOCATIONS
     }
+
+@router.get("/recommended")
+async def get_recommended_parking(
+    lat: float,
+    lon: float,
+    radius: int = 3000,
+    limit: int = 3
+):
+    result = find_best_parking(lat, lon, radius, limit)
+
+    if not result:
+        raise HTTPException(status_code=404, detail="No parking found")
+
+    return {
+        "count": len(result),
+        "locations": result
+    }
+

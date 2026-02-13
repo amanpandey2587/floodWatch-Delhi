@@ -167,17 +167,23 @@ export function useComplaintAPI() {
 // Safe Parking API hook
 export function useSafeParkingAPI() {
   return {
-    async getNearby(params: { lat: number; lon: number; radius?: number; limit?: number }) {
-      const response = await axios.get(`${API_BASE_URL}/api/safe-parking`, { params });
+    async getRecommended(params: { lat: number; lon: number; radius?: number; limit?: number }) {
+      const response = await axios.get(
+        `${API_BASE_URL}/api/safe-parking/recommended`,
+        { params }
+      );
       return response.data;
     },
 
     async getAll() {
-      const response = await axios.get(`${API_BASE_URL}/api/safe-parking/all`);
+      const response = await axios.get(
+        `${API_BASE_URL}/api/safe-parking/all`
+      );
       return response.data;
     },
   };
 }
+
 
 // Admin API hook
 export function useAdminAPI() {

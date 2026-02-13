@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request
+from fastapi import APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -14,6 +15,7 @@ from routes import (
     social_routes
 )
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Starting up...")
@@ -22,6 +24,7 @@ async def lifespan(app: FastAPI):
     print("Shutting down...")
 
 app = FastAPI(title="Delhi Water-logging API", lifespan=lifespan)
+
 
 # Log request validation errors (422) before they reach route handlers
 @app.exception_handler(RequestValidationError)

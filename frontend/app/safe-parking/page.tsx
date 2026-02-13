@@ -5,18 +5,15 @@ import { useSafeParkingAPI } from '@/lib/api';
 import { MapPin, Navigation, Loader, AlertTriangle } from 'lucide-react';
 
 interface ParkingLocation {
-  id: string;
   name: string;
-  address: string;
-  lat: number;
-  lon: number;
-  type: string;
-  capacity: number;
-  elevation_m: number;
-  ward_number: number;
-  distance_m?: number;
-  distance_km?: number;
+  lat: number | null;
+  lon: number | null;
+  risk: string | null;
+  distance_m: number | null;
+  final_score: number | null;
+  route: { lat: number; lon: number }[];
 }
+
 
 export default function SafeParkingPage() {
   const safeParkingAPI = useSafeParkingAPI();
@@ -46,14 +43,14 @@ export default function SafeParkingPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await safeParkingAPI.getNearby({
+      const data = await safeParkingAPI.getRecommended({
         lat: latNum,
         lon: lonNum,
         radius: parseNumber(radius) ?? 2000,
         limit: parseNumber(limit) ?? 3,
       });
       setLocations(data.locations || []);
-      setLastSearch(`Nearby within ${data.search_params?.radius_m ?? radius}m`);
+      setLastSearch(`Smart recommendation within ${radius}m`);
     } catch (err: any) {
       setError(err?.message || 'Failed to load safe parking locations');
     } finally {
@@ -61,19 +58,19 @@ export default function SafeParkingPage() {
     }
   };
 
-  const fetchAll = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await safeParkingAPI.getAll();
-      setLocations(data.locations || []);
-      setLastSearch('All locations');
-    } catch (err: any) {
-      setError(err?.message || 'Failed to load safe parking locations');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // const fetchAll = async () => {
+  //   setLoading(true);
+  //   setError(null);
+  //   try {
+  //     const data = await safeParkingAPI.getAll();
+  //     setLocations(data.locations || []);
+  //     setLastSearch('All locations');
+  //   } catch (err: any) {
+  //     setError(err?.message || 'Failed to load safe parking locations');
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   const useMyLocation = () => {
     if (!navigator.geolocation) {
@@ -117,13 +114,13 @@ export default function SafeParkingPage() {
             >
               Use My Location
             </button>
-            <button
+            {/* <button
               className="px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-800 dark:text-white border border-slate-300 dark:border-slate-700 font-semibold"
               onClick={fetchAll}
               disabled={loading}
             >
               Show All
-            </button>
+            </button> */}
           </div>
         </div>
 
@@ -152,7 +149,7 @@ export default function SafeParkingPage() {
               className="mt-2 w-full rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 px-3 py-2 text-slate-900 dark:text-slate-100"
               value={radius}
               onChange={(e) => setRadius(e.target.value)}
-              placeholder="2000"
+              placeholder="5000"
             />
           </div>
           <div>
@@ -161,7 +158,7 @@ export default function SafeParkingPage() {
               className="mt-2 w-full rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 px-3 py-2 text-slate-900 dark:text-slate-100"
               value={limit}
               onChange={(e) => setLimit(e.target.value)}
-              placeholder="3"
+              placeholder="4"
             />
           </div>
         </div>
@@ -200,30 +197,35 @@ export default function SafeParkingPage() {
           )}
 
           <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-            {locations.map((loc) => (
-              <div key={loc.id} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-5">
+            {locations.map((loc, index) => (
+              <div
+                key={index}
+                className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-5"
+              >
                 <div className="flex items-start justify-between">
                   <div>
-                    <h3 className="text-lg font-semibold text-white">{loc.name}</h3>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">{loc.address}</p>
+                    <h3 className="text-lg font-semibold text-white">
+                      {loc.name || "Safe Parking"}
+                    </h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      Risk: {loc.risk ?? "Unknown"}
+                    </p>
                   </div>
+
                   <span className="text-xs px-2 py-1 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-300 border border-cyan-500/30">
-                    {loc.type.replace('_', ' ')}
+                    Score {loc.final_score ?? "N/A"}
                   </span>
                 </div>
+
                 <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-slate-600 dark:text-slate-300">
                   <div className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-cyan-400" /> Ward {loc.ward_number}
-                  </div>
-                  <div className="flex items-center gap-2">
                     <Navigation className="w-4 h-4 text-cyan-400" />
-                    {loc.distance_km !== undefined ? `${loc.distance_km} km` : 'Distance n/a'}
+                    {loc.distance_m ? `${loc.distance_m} m` : "Distance n/a"}
                   </div>
-                  <div>Capacity: {loc.capacity}</div>
-                  <div>Elevation: {loc.elevation_m} m</div>
                 </div>
+
                 <div className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-                  Lat {loc.lat.toFixed(4)}, Lon {loc.lon.toFixed(4)}
+                  Lat {loc.lat?.toFixed(4) ?? "-"}, Lon {loc.lon?.toFixed(4) ?? "-"}
                 </div>
               </div>
             ))}
