@@ -2,7 +2,7 @@
 
 > **A multi-platform solution for urban flood risk awareness, safe routing, and citizen issue management in Delhi.**
 
-![Status](https://img.shields.io/badge/Status-Prototype-blue) ![Stack](https://img.shields.io/badge/Stack-FastAPI%20%7C%20Next.js%20%7C%20Expo-orange) ![License](https://img.shields.io/badge/License-MIT-green)
+ ![Stack](https://img.shields.io/badge/Stack-FastAPI%20%7C%20Next.js%20%7C%20Expo-orange) ![License](https://img.shields.io/badge/License-MIT-green)
 
 ## 📖 Overview
 
