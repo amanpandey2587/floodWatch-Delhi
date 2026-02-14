@@ -1,6 +1,8 @@
 #  FloodWatch Delhi
 
 > **A multi-platform solution for urban flood risk awareness, safe routing, and citizen issue management in Delhi.**
+## 🎥 Detailed Walkthrough
+[Watch the Detailed Video on YouTube](https://www.youtube.com/watch?v=Fx_W3hB4WNQ)
 
  ![Stack](https://img.shields.io/badge/Stack-FastAPI%20%7C%20Next.js%20%7C%20Expo-orange) ![License](https://img.shields.io/badge/License-MIT-green)
 
@@ -18,20 +20,29 @@ FloodWatch Delhi bridges the gap between **Proactive Intelligence** and **Reacti
 * **Flood-Risk Prediction:** Uses **GeoPandas** and **scikit-learn** to model risk based on elevation, drainage capacity, and rainfall intensity.
 * **Ward-Level Insights:** Granular risk views and preparedness stats for specific Delhi wards.
 * **Simulation Control:** Adjust rainfall parameters to visualize potential impact hotspots.
+<img width="1046" height="560" alt="image" src="https://github.com/user-attachments/assets/3b9f4431-42b7-4c28-b2d6-853638d6e05d" />
 
 ###  Smart Routing & Safe Parking
 * **Risk-Aware Navigation:** Integrated with **OSMnx** and **Google Maps API** to score route segments based on flood risk, guiding users away from waterlogged areas.
 * **Safe Parking:** API endpoints that recommend high-elevation parking spots within a user's vicinity.
+<img width="1059" height="547" alt="image" src="https://github.com/user-attachments/assets/7b298885-960f-49ef-a7cb-3f014f30ff88" />
+<img width="1050" height="547" alt="image" src="https://github.com/user-attachments/assets/8f1259eb-5083-4df0-a431-33956c64973f" />
 
 ###  Citizen Reporting & Management
 * **Unified Complaint System:** File complaints via Web or Mobile with location tagging, water depth, and priority levels.
 * **Image Verification:** Automated pipelines to verify complaint authenticity (filtering AI-generated/spam images).
 * **Timeline & Tracking:** Real-time status updates (Pending → Resolved) with Ward Officer ETAs.
+<img width="1044" height="545" alt="image" src="https://github.com/user-attachments/assets/9e42c01a-1ff3-44f2-a193-149d5e71426e" />
 
 ###  Ward Officer Dashboard
 * **Social Monitoring Panel:** Aggregates distress signals from Twitter/X, Reddit, and YouTube (via API integration) to identify unreported hotspots.
+  <img width="1045" height="528" alt="image" src="https://github.com/user-attachments/assets/2237c442-38be-42dd-ba65-c1d905462c76" />
+
 * **Emergency Broadcasts:** Admin tools to send alerts to specific wards.
+  <img width="1056" height="542" alt="image" src="https://github.com/user-attachments/assets/d8e7cb55-8d88-49be-9e36-e977cd4bc457" />
+
 * **Role-Based Access:** Secure JWT authentication separating Citizen and Admin workflows.
+<img width="1050" height="551" alt="image" src="https://github.com/user-attachments/assets/395770e9-a216-4b9a-b74e-7ec9206afe1f" />
 
 ---
 
