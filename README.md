@@ -55,6 +55,8 @@ floodWatch-Delhi/
       app/                  # Screens
       lib/                  # API connectors
 
+```
+
 ## 🛠️ Tech Stack
 
 **Frontend & Mobile**
@@ -121,7 +123,6 @@ python -m venv .venv
 
 pip install -r requirements.txt
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
 
 Health checks:
 
@@ -143,7 +144,7 @@ Open: `http://localhost:3000`
 ```bash
 cd mobile/waterlogging-app
 npm install
-npm run start
+npx expo start
 ```
 
 Then choose Android/iOS/Web from Expo CLI.
