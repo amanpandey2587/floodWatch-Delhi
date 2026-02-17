@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request
+import os
 from fastapi import APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
@@ -15,7 +16,8 @@ from routes import (
     safe_parking_routes,
     social_routes
 )
-
+# load_dotenv()
+PORT = os.getenv("PORT", "8000")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -86,4 +88,4 @@ def health():
     return {"status":"ok"}
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=True)
