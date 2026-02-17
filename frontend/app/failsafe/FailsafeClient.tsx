@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { useSafeParkingAPI } from '@/lib/api';
+import { API_BASE_URL, useSafeParkingAPI } from '@/lib/api';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { GoogleMap, useJsApiLoader, Polygon, Polyline, Marker, InfoWindow, Circle } from '@react-google-maps/api';
 
@@ -105,7 +105,7 @@ export default function WaterloggingMap() {
     setParkingError(null);
 
     try {
-      const data = await safeParkingAPI.getNearby({
+      const data = await safeParkingAPI.getRecommended({
         lat: latNum,
         lon: lonNum,
         radius: parseNumber(parkingRadius) ?? 2000,
@@ -120,11 +120,19 @@ export default function WaterloggingMap() {
   };
 
   const fetchAllParking = async () => {
+    const latNum = parseNumber(parkingLat) ?? center.lat;
+    const lonNum = parseNumber(parkingLon) ?? center.lng;
+
     setParkingLoading(true);
     setParkingError(null);
 
     try {
-      const data = await safeParkingAPI.getAll();
+      const data = await safeParkingAPI.getRecommended({
+        lat: latNum,
+        lon: lonNum,
+        radius: Math.max(parseNumber(parkingRadius) ?? 2000, 10000),
+        limit: Math.max(parseNumber(parkingLimit) ?? 3, 50),
+      });
       setParkingLocations(data.locations || []);
     } catch (err: any) {
       setParkingError(err?.message || 'Failed to load safe parking.');
@@ -176,10 +184,10 @@ export default function WaterloggingMap() {
       try {
         setLoading(true);
         const [gridRes, wardsRes, drainsRes, statsRes] = await Promise.all([
-          fetch(`http://localhost:8000/api/grid?risk_min=${filterRisk}`),
-          fetch('http://localhost:8000/api/wards'),
-          fetch('http://localhost:8000/api/drains'),
-          fetch('http://localhost:8000/api/stats')
+          fetch(`${API_BASE_URL}/api/grid?risk_min=${filterRisk}`),
+          fetch(`${API_BASE_URL}/api/wards`),
+          fetch(`${API_BASE_URL}/api/drains`),
+          fetch(`${API_BASE_URL}/api/stats`)
         ]);
 
         const [grid, wards, drains, stats] = await Promise.all([
@@ -635,7 +643,7 @@ function RoutePanelContent({ onRouteCalculated, onClearRoute }: { onRouteCalcula
 
   const resolveLocation = async (query: string) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/geocode?query=${encodeURIComponent(query)}`);
+      const res = await fetch(`${API_BASE_URL}/api/geocode?query=${encodeURIComponent(query)}`);
       if (!res.ok) throw new Error('Geocoding failed');
       const data = await res.json();
       if (data.length === 0) throw new Error(`Location not found: ${query}`);
@@ -658,7 +666,7 @@ function RoutePanelContent({ onRouteCalculated, onClearRoute }: { onRouteCalcula
       if (!endLoc) throw new Error(`Could not find end location: "${endQuery}"`);
 
       const response = await fetch(
-        `http://localhost:8000/api/route?` +
+        `${API_BASE_URL}/api/route?` +
         `start_lat=${startLoc.lat}&start_lon=${startLoc.lon}&` +
         `end_lat=${endLoc.lat}&end_lon=${endLoc.lon}&` +
         `profile=${profile}`

@@ -1,9 +1,22 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet';
-import L from 'leaflet';
+import dynamic from 'next/dynamic';
+import { API_BASE_URL } from '@/lib/api';
 import 'leaflet/dist/leaflet.css';
+
+const MapContainer = dynamic(
+  () => import('react-leaflet').then((mod) => mod.MapContainer),
+  { ssr: false }
+);
+const TileLayer = dynamic(
+  () => import('react-leaflet').then((mod) => mod.TileLayer),
+  { ssr: false }
+);
+const GeoJSON = dynamic(
+  () => import('react-leaflet').then((mod) => mod.GeoJSON),
+  { ssr: false }
+);
 
 interface MapData {
   grid: any;
@@ -55,10 +68,10 @@ export default function WaterloggingMap() {
         
         // Fetch all data in parallel
         const [gridRes, wardsRes, drainsRes, statsRes] = await Promise.all([
-          fetch(`http://localhost:8000/api/grid?risk_min=${filterRisk}`),
-          fetch('http://localhost:8000/api/wards'),
-          fetch('http://localhost:8000/api/drains'),
-          fetch('http://localhost:8000/api/stats')
+          fetch(`${API_BASE_URL}/api/grid?risk_min=${filterRisk}`),
+          fetch(`${API_BASE_URL}/api/wards`),
+          fetch(`${API_BASE_URL}/api/drains`),
+          fetch(`${API_BASE_URL}/api/stats`)
         ]);
 
         const [grid, wards, drains, stats] = await Promise.all([
@@ -81,7 +94,7 @@ export default function WaterloggingMap() {
   }, [filterRisk]);
 
   // Popup content for grid cells
-  const onEachGridFeature = (feature: any, layer: L.Layer) => {
+  const onEachGridFeature = (feature: any, layer: any) => {
     if (feature.properties) {
       const props = feature.properties;
       
@@ -120,7 +133,7 @@ export default function WaterloggingMap() {
   };
 
   // Popup for wards
-  const onEachWardFeature = (feature: any, layer: L.Layer) => {
+  const onEachWardFeature = (feature: any, layer: any) => {
     if (feature.properties) {
       const props = feature.properties;
       

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Map, AlertTriangle, Shield } from 'lucide-react'
+import { API_BASE_URL } from '@/lib/api'
 
 interface WardRisk {
   ward_id: string
@@ -23,8 +24,6 @@ interface WardRisk {
 interface WardRiskPanelProps {
   rainfallIntensity: number
 }
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 export default function WardRiskPanel({ rainfallIntensity }: WardRiskPanelProps) {
   const [wardRisks, setWardRisks] = useState<WardRisk[]>([])

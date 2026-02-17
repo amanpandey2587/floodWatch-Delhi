@@ -1,23 +1,19 @@
 'use client';
 
 import ComplaintDetail from '@/components/ComplaintDetail';
-import { useParams } from 'next/navigation';
-import { use } from 'react';
 
 interface PageProps {
-  params: Promise<{ id: string }>;
+  params: {
+    id: string | string[];
+  };
 }
 
 export default function TrackComplaintDetailPage({ params }: PageProps) {
-  // Use React's use() hook to unwrap the Promise
-  // const { id } = use(params);
-  const {id}=useParams();
-  console.log(id);
-  console.log(params)
+  const complaintId = Array.isArray(params.id) ? params.id.join('/') : params.id;
   
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 py-12">
-      <ComplaintDetail complaintId={id} />
+      <ComplaintDetail complaintId={complaintId} />
     </div>
   );
 }

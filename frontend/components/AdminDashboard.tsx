@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAdminAPI } from '@/lib/api';
+import { API_BASE_URL, useAdminAPI } from '@/lib/api';
 import { useAuth } from '@/lib/AuthContext';
 import NotificationBroadcast from './NotificationBroadcast';
 import SOSBroadcast from './SOSBroadcast';
@@ -63,7 +63,7 @@ export default function AdminDashboard() {
   useEffect(() => {
       const fetchWards = async () => {
         try {
-        const response = await fetch('http://localhost:8000/api/wards');
+        const response = await fetch(`${API_BASE_URL}/api/wards`);
         
         if (!response.ok) {
           throw new Error(`Failed to fetch wards: ${response.statusText}`);
@@ -132,15 +132,7 @@ export default function AdminDashboard() {
                 <h3 className="font-semibold text-lg mb-2">Error Loading Dashboard</h3>
                 <p className="text-sm mb-4">{error}</p>
                 
-                <div className="bg-red-100 dark:bg-red-900/40 border border-red-300 dark:border-red-800 rounded p-3 mb-4 text-xs">
-                  <strong>Troubleshooting:</strong>
-                  <ul className="list-disc list-inside mt-2 space-y-1">
-                    <li>Make sure the backend server is running on http://localhost:8000</li>
-                    <li>Check that the /api/admin/dashboard endpoint is accessible</li>
-                    <li>Verify ward number {wardNumber} exists in the database</li>
-                    <li>Check browser console for detailed error logs</li>
-                  </ul>
-                </div>
+
 
                 <button
                   onClick={handleRefresh}

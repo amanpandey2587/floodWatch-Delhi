@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
+import { API_BASE_URL } from '@/lib/api';
 import Sidebar from '@/components/Sidebar';
 import StatsPanel from '@/components/StatsPanel';
 import WardRiskPanel from '@/components/WardRiskPanel';
@@ -88,7 +89,7 @@ export default function MapPage() {
   const fetchPredictions = useCallback(async (rainfall: number) => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/predict', {
+      const response = await fetch(`${API_BASE_URL}/predict`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -106,7 +107,7 @@ export default function MapPage() {
 
   const fetchWards = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:8000/wards');
+      const response = await fetch(`${API_BASE_URL}/wards`);
       const data = await response.json();
       setWards(data || []);
     } catch (error) {
@@ -116,7 +117,7 @@ export default function MapPage() {
 
   const fetchCrowdsourceReports = useCallback(async (rainfall: number) => {
     try {
-      const response = await fetch(`http://localhost:8000/crowdsource?rainfall_intensity=${rainfall}`);
+      const response = await fetch(`${API_BASE_URL}/crowdsource?rainfall_intensity=${rainfall}`);
       const data = await response.json();
       setCrowdsourceReports(data.reports || []);
     } catch (error) {
@@ -126,7 +127,7 @@ export default function MapPage() {
 
   const calculateRoute = useCallback(async (routeData: { start: string; end: string }) => {
     try {
-      const response = await fetch('http://localhost:8000/route', {
+      const response = await fetch(`${API_BASE_URL}/route`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

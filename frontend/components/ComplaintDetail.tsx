@@ -24,6 +24,7 @@ interface Complaint {
   ward_number: number;
   status: string;
   priority: string;
+  created_by: string;
   created_at: string;
   updated_at: string;
   location?: { latitude: number; longitude: number };

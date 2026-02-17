@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { API_BASE_URL } from '@/lib/api';
 
 interface RoutePanelProps {
   onRouteCalculated: (routeData: any) => void;
@@ -17,7 +18,7 @@ export default function RoutePanel({ onRouteCalculated, onClearRoute }: RoutePan
 
   const resolveLocation = async (query: string) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/geocode?query=${encodeURIComponent(query)}`);
+      const res = await fetch(`${API_BASE_URL}/api/geocode?query=${encodeURIComponent(query)}`);
       if (!res.ok) throw new Error('Geocoding failed');
       const data = await res.json();
       if (data.length === 0) throw new Error(`Location not found: ${query}`);
@@ -40,7 +41,7 @@ export default function RoutePanel({ onRouteCalculated, onClearRoute }: RoutePan
       if (!endLoc) throw new Error(`Could not find end location: "${endQuery}"`);
 
       const response = await fetch(
-        `http://localhost:8000/api/route?` +
+        `${API_BASE_URL}/api/route?` +
         `start_lat=${startLoc.lat}&start_lon=${startLoc.lon}&` +
         `end_lat=${endLoc.lat}&end_lon=${endLoc.lon}&` +
         `profile=${profile}`

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSafeParkingAPI } from '@/lib/api';
+import { API_BASE_URL, useSafeParkingAPI } from '@/lib/api';
 import { Navigation, Loader, AlertTriangle, MapPin, Clock, Route } from 'lucide-react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Polyline, Polygon } from '@react-google-maps/api';
 
@@ -81,8 +81,6 @@ const reverseGeocode = async (lat: number, lon: number): Promise<string> => {
     return `Location (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
   }
 };
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 const mapContainerStyle = {
   width: '100%',

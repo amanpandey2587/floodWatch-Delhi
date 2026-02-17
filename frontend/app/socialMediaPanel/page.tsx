@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { API_BASE_URL } from '@/lib/api';
 
 interface WardRisk {
   mention_count: number;
@@ -33,7 +34,7 @@ export default function SocialMediaPanel() {
 
   const fetchMonitoringData = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/social/monitor/status');
+      const response = await fetch(`${API_BASE_URL}/api/social/monitor/status`);
       const data = await response.json();
       
       if (data.status === 'success') {
@@ -52,7 +53,7 @@ export default function SocialMediaPanel() {
     setLoading(true);
     try {
       const response = await fetch(
-        'http://localhost:8000/api/social/monitor/start?hours_back=24',
+        `${API_BASE_URL}/api/social/monitor/start?hours_back=24`,
         { method: 'POST' }
       );
       const data = await response.json();
