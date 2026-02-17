@@ -7,6 +7,7 @@ flood_model.pkl
 env/
 venv/
 ENV/
+cache/
 .venv
 .vevn
 

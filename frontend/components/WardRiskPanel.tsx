@@ -24,6 +24,8 @@ interface WardRiskPanelProps {
   rainfallIntensity: number
 }
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
 export default function WardRiskPanel({ rainfallIntensity }: WardRiskPanelProps) {
   const [wardRisks, setWardRisks] = useState<WardRisk[]>([])
   const [loading, setLoading] = useState(false)
@@ -32,7 +34,7 @@ export default function WardRiskPanel({ rainfallIntensity }: WardRiskPanelProps)
     const fetchWardRisks = async () => {
       setLoading(true)
       try {
-        const response = await fetch(`http://localhost:8000/wards/risk?rainfall_intensity=${rainfallIntensity}`)
+        const response = await fetch(`${API_BASE_URL}/wards/risk?rainfall_intensity=${rainfallIntensity}`)
         const data = await response.json()
         setWardRisks(data.ward_risks || [])
       } catch (error) {

@@ -10,6 +10,7 @@ from routes import (
     complaint_routes,
     notification_routes,
     map_routes,
+    frontend_map_routes,
     admin_routes,
     safe_parking_routes,
     social_routes
@@ -26,7 +27,6 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Delhi Water-logging API", lifespan=lifespan)
 
 
-# Log request validation errors (422) before they reach route handlers
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     body_bytes = await request.body()
@@ -56,6 +56,7 @@ app.include_router(auth_routes.router)
 app.include_router(complaint_routes.router)
 app.include_router(notification_routes.router)
 app.include_router(map_routes.router)
+app.include_router(frontend_map_routes.router)
 app.include_router(admin_routes.router)
 app.include_router(safe_parking_routes.router)
 app.include_router(social_routes.router)

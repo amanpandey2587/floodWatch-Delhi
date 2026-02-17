@@ -5,9 +5,13 @@ import dynamic from 'next/dynamic';
 import Sidebar from '@/components/Sidebar';
 import StatsPanel from '@/components/StatsPanel';
 import WardRiskPanel from '@/components/WardRiskPanel';
-import RouteCalculator from '@/components/RouteCalculator';
-import FeatureToggles from '@/components/FeatureToggles';
 import MapModeToggle from '@/components/MapModeToggle';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 
 const EnhancedMap = dynamic(() => import('@/components/EnhancedMap'), {
   ssr: false,
@@ -168,7 +172,7 @@ export default function MapPage() {
   };
 
   return (
-    <main className="relative w-screen h-screen overflow-hidden">
+    <main className="relative w-screen h-screen overflow-hidden overflow-x-clip">
       {/* Map Container - z-0 (bottom layer) */}
       <div className="absolute inset-0 z-0">
         {mapMode === 'leaflet' ? (
@@ -197,60 +201,82 @@ export default function MapPage() {
         )}
       </div>
 
-      {/* Header - z-20 */}
       <div className="absolute top-4 left-4 z-20 pointer-events-none">
-        <h1 className="text-3xl font-bold text-white drop-shadow-lg">FloodWatch Delhi</h1>
-        <p className="text-sm text-white/80 drop-shadow-md">Real-time Flood Risk Prediction & Management</p>
+        <h1 className="text-3xl font-bold text-slate-800 drop-shadow-lg">FloodWatch Delhi</h1>
+        <p className="text-sm text-slate-800 drop-shadow-md">Real-time Flood Risk Prediction & Management</p>
       </div>
 
-      {/* Left Sidebar Panel - z-30 */}
       <div className="absolute left-4 top-24 bottom-4 z-30 flex flex-col gap-4 w-[280px] pointer-events-none">
         <div className="flex flex-col gap-4 overflow-y-auto pointer-events-auto max-h-full">
-          <MapModeToggle currentMode={mapMode} onModeChange={handleMapModeChange} />
+          <div className="bg-white/95 dark:bg-slate-900/90 rounded-lg shadow-xl border border-slate-200 dark:border-slate-800 px-4">
+            <Accordion type="multiple" defaultValue={['map-mode', 'simulation']} className="w-full">
+              <AccordionItem value="map-mode" className="border-slate-200 dark:border-slate-800">
+                <AccordionTrigger>Map Mode</AccordionTrigger>
+                <AccordionContent>
+                  <MapModeToggle currentMode={mapMode} onModeChange={handleMapModeChange} />
+                </AccordionContent>
+              </AccordionItem>
 
-          <Sidebar
-            rainfallIntensity={rainfallIntensity}
-            onRainfallChange={handleRainfallChange}
-            loading={loading}
-          />
+              <AccordionItem value="simulation" className="border-slate-200 dark:border-slate-800">
+                <AccordionTrigger>Simulation Controls</AccordionTrigger>
+                <AccordionContent>
+                  <Sidebar
+                    rainfallIntensity={rainfallIntensity}
+                    onRainfallChange={handleRainfallChange}
+                    loading={loading}
+                  />
+                </AccordionContent>
+              </AccordionItem>
 
-          <RouteCalculator onRouteCalculate={calculateRoute} />
-
-          <FeatureToggles
-            showTraffic={showTraffic}
-            showWards={showWards}
-            showCrowdsource={showCrowdsource}
-            onToggleTraffic={() => setShowTraffic(!showTraffic)}
-            onToggleWards={() => setShowWards(!showWards)}
-            onToggleCrowdsource={() => setShowCrowdsource(!showCrowdsource)}
-          />
-
-          {route && route.warnings.length > 0 && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 shadow-lg">
-              <h4 className="font-semibold text-red-800 mb-2">Route Warnings</h4>
-              <ul className="text-sm text-red-700 space-y-1">
-                {route.warnings.map((warning, idx) => (
-                  <li key={idx}>{warning}</li>
-                ))}
-              </ul>
-              {route.distance_km && (
-                <div className="mt-2 text-xs text-red-600 pt-2 border-t border-red-200">
-                  Distance: {route.distance_km} km - Duration: {route.duration_min} min
-                </div>
+              {route && route.warnings.length > 0 && (
+                <AccordionItem value="warnings" className="border-slate-200 dark:border-slate-800">
+                  <AccordionTrigger>Route Warnings</AccordionTrigger>
+                  <AccordionContent>
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 shadow-lg">
+                      <h4 className="font-semibold text-red-800 mb-2">Route Warnings</h4>
+                      <ul className="text-sm text-red-700 space-y-1">
+                        {route.warnings.map((warning, idx) => (
+                          <li key={idx}>{warning}</li>
+                        ))}
+                      </ul>
+                      {route.distance_km && (
+                        <div className="mt-2 text-xs text-red-600 pt-2 border-t border-red-200">
+                          Distance: {route.distance_km} km - Duration: {route.duration_min} min
+                        </div>
+                      )}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
               )}
-            </div>
-          )}
+            </Accordion>
+          </div>
         </div>
       </div>
 
-      {/* Right Top - Stats Panel - z-40 */}
       <div className="absolute top-4 right-4 z-40 pointer-events-auto">
-        <StatsPanel activeAlerts={activeAlerts} totalHotspots={hotspots.length} />
+        <div className="bg-white/95 dark:bg-slate-900/90 rounded-lg shadow-xl border border-slate-200 dark:border-slate-800 px-4 min-w-[220px]">
+          <Accordion type="single" collapsible defaultValue="alerts">
+            <AccordionItem value="alerts" className="border-slate-200 dark:border-slate-800">
+              <AccordionTrigger>Alerts</AccordionTrigger>
+              <AccordionContent>
+                <StatsPanel activeAlerts={activeAlerts} totalHotspots={hotspots.length} />
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </div>
       </div>
 
-      {/* Right Bottom - Ward Risk Panel - z-30 */}
-      <div className="absolute bottom-4 right-4 z-30 pointer-events-auto">
-        <WardRiskPanel rainfallIntensity={rainfallIntensity} />
+      <div className="absolute top-14 right-4 z-30 pointer-events-auto">
+        <div className="bg-white/95 dark:bg-slate-900/90 rounded-lg shadow-xl border border-slate-200 dark:border-slate-800 px-4 min-w-[360px]">
+          <Accordion type="single" collapsible defaultValue="ward-risk">
+            <AccordionItem value="ward-risk" className="border-slate-200 dark:border-slate-800">
+              <AccordionTrigger>Ward Risk</AccordionTrigger>
+              <AccordionContent>
+                <WardRiskPanel rainfallIntensity={rainfallIntensity} />
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </div>
       </div>
     </main>
   );
