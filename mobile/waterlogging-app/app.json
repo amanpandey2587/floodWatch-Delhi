@@ -26,7 +26,8 @@
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
-      ]
+      ],
+      "package": "com.ap12qw.waterloggingapp"
     },
     "web": {
       "output": "static",
@@ -52,7 +53,12 @@
       "typedRoutes": true,
       "reactCompiler": true
     },
-    "config": {
+    "config": {},
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "9b4b21a7-f284-4aa2-85ad-5a01df496615"
+      }
     }
   }
 }
