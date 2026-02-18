@@ -11,6 +11,8 @@
 FloodWatch Delhi bridges the gap between **Proactive Intelligence** and **Reactive Governance**. It empowers citizens with real-time flood risk visualization and safe routing while providing Ward Officers with a command center for monitoring social distress signals and managing verified complaints.
 
  The system operates as a monorepo containing a **FastAPI** backend (analytics & logic), a **Next.js** web dashboard (for citizens/admins), and an **Expo React Native** mobile app (for on-ground reporting).
+## 🔗 Deployed Website
+[Click Here](https://flood-watch-delhi.vercel.app/)
 
 ---
 
