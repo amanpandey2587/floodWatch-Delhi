@@ -1,5 +1,5 @@
 from fastapi import HTTPException
-from notifications import create_ward_broadcast, get_user_notifications, get_ward_notifications
+from utils.notifications import create_ward_broadcast, get_user_notifications, get_ward_notifications
 from models import NotificationModel
 
 class NotificationController:

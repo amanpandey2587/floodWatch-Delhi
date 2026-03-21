@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Query
-from social_monitor import start_monitoring, get_status
+from utils.social_monitor import start_monitoring, get_status
 
 router = APIRouter(prefix="/api/social", tags=["Social"])
 

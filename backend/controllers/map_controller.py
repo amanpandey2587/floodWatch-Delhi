@@ -7,10 +7,10 @@ from core.state import state
 import polyline
 
 # REMOVE: from core.config import MAPBOX_TOKEN
-from hotspots import HOTSPOTS
-from wards import WARDS, LANDMARKS
-from crowdsource import generate_crowdsource_reports
-from preparedness import calculate_ward_preparedness
+from utils.hotspots import HOTSPOTS
+from utils.wards import WARDS, LANDMARKS
+from utils.crowdsource import generate_crowdsource_reports
+from utils.preparedness import calculate_ward_preparedness
 from shapely.geometry import LineString
 
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
@@ -377,33 +377,99 @@ class MapController:
             "residents_notified": contacts_count,
             "timestamp": int(time.time()),
         }
-
     @staticmethod
-    def get_grid_data(limit: int = None, risk_min: float = 0.0, risk_max: float = 1.0):
+    def get_grid_data(
+        limit: int = None,
+        risk_min: float = 0.0,
+        risk_max: float = 1.0,
+        bbox_n: float = None,
+        bbox_s: float = None,
+        bbox_e: float = None,
+        bbox_w: float = None,
+        zoom: int = 12,              # ← ADD THIS
+    ):
         if state.grid_data is None:
             raise HTTPException(status_code=503, detail="Data not loaded yet")
 
-        # Filter by risk score
+        has_bbox = all(v is not None for v in [bbox_n, bbox_s, bbox_e, bbox_w])
+        bbox_str = (
+            f"{bbox_n:.3f}:{bbox_s:.3f}:{bbox_e:.3f}:{bbox_w:.3f}"
+            if has_bbox else "full"
+        )
+        cache_key = f"grid:{risk_min:.2f}:{risk_max:.2f}:{bbox_str}:z{zoom}"  # ← add zoom to key
+        if limit:
+            cache_key += f":lim{limit}"
+
+        if state.redis is not None:
+            try:
+                cached = state.redis.get(cache_key)
+                if cached:
+                    print(f"[Redis HIT] {cache_key}")
+                    import json as _json
+                    return _json.loads(cached)
+            except Exception as e:
+                print(f"[Redis ERROR] {e}")
+                pass
+
         features = state.grid_data["features"]
-        filtered_features = [
-            f
-            for f in features
+
+        if has_bbox:
+            features = [
+                f for f in features
+                if (
+                    bbox_s <= f["properties"].get("center_lat", f["properties"].get("lat", 0)) <= bbox_n
+                    and
+                    bbox_w <= f["properties"].get("center_lon", f["properties"].get("lon", 0)) <= bbox_e
+                )
+            ]
+
+        features = [
+            f for f in features
             if risk_min <= f["properties"].get("risk_score", 0) <= risk_max
         ]
 
-        # Apply limit if specified
-        if limit:
-            filtered_features = filtered_features[:limit]
+        # ── ADD THIS BLOCK ───────────────────────────────────────────────────────
+        # At city zoom strip all heavy properties — deck.gl only needs risk_score
+        # and risk_category to colour the cells. Everything else is only needed
+        # when the user is zoomed in and clicks a specific cell.
+        if zoom < 13:
+            features = [
+                {
+                    "type": "Feature",
+                    "geometry": f["geometry"],
+                    "properties": {
+                        "risk_score":    f["properties"].get("risk_score", 0),
+                        "risk_category": f["properties"].get("risk_category", ""),
+                        "cell_id":       f["properties"].get("cell_id", ""),
+                    },
+                }
+                for f in features
+            ]
+        # ─────────────────────────────────────────────────────────────────────────
 
-        return {
+        if limit:
+            features = features[:limit]
+
+        result = {
             "type": "FeatureCollection",
-            "features": filtered_features,
+            "features": features,
             "metadata": {
-                "total": len(filtered_features),
-                "filtered": len(filtered_features) < len(features),
+                "total": len(features),
+                "filtered": len(features) < len(state.grid_data["features"]),
             },
         }
 
+        if state.redis is not None:
+            try:
+                import json as _json
+                ttl = 1800 if has_bbox else 3600
+                state.redis.setex(cache_key, ttl, _json.dumps(result))
+                print(f"[Redis SET] {cache_key} — {len(features)} features, TTL={ttl}s")
+            except Exception as e:
+                print(f"[Redis WRITE ERROR] {e}")
+                pass
+
+        return result
     @staticmethod
     def get_drains_data():
         if state.drains_data is None:

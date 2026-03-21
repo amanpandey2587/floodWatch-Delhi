@@ -93,9 +93,17 @@ async def get_route(
 def get_grid_data(
     limit: int = Query(None, description="Limit number of cells"),
     risk_min: float = Query(0.0, description="Minimum risk score"),
-    risk_max: float = Query(1.0, description="Maximum risk score")
+    risk_max: float = Query(1.0, description="Maximum risk score"),
+    bbox_n: float = Query(None, description="Viewport north bound"),   # ← ADD
+    bbox_s: float = Query(None, description="Viewport south bound"),   # ← ADD
+    bbox_e: float = Query(None, description="Viewport east bound"),    # ← ADD
+    bbox_w: float = Query(None, description="Viewport west bound"),
+    zoom: int = Query(12)    # ← ADD
 ):
-    return MapController.get_grid_data(limit, risk_min, risk_max)
+    return MapController.get_grid_data(
+        limit, risk_min, risk_max,
+        bbox_n, bbox_s, bbox_e, bbox_w ,zoom   # ← ADD these four args
+    )
 
 @router.get("/api/drains")
 def get_drains_data():

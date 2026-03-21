@@ -16,8 +16,9 @@ from routes import (
     safe_parking_routes,
     social_routes
 )
-# load_dotenv()
-PORT = os.getenv("PORT", "8000")
+from fastapi.middleware.gzip import GZipMiddleware
+
+PORT = 8000
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -27,7 +28,6 @@ async def lifespan(app: FastAPI):
     print("Shutting down...")
 
 app = FastAPI(title="Delhi Water-logging API", lifespan=lifespan)
-
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -51,7 +51,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Include Routers
 app.include_router(auth_routes.router)
@@ -78,10 +78,6 @@ def read_root():
             "social": "/api/social"
         }
     }
-
-@app.get('/')
-def home():
-    return{"Hello : this is homepage"}
 
 @app.get('/health')
 def health():

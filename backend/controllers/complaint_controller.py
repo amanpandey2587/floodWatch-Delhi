@@ -1,6 +1,6 @@
 from fastapi import HTTPException
 from fastapi.encoders import jsonable_encoder
-from complaints_db import (
+from utils.complaints_db import (
     file_complaint, assign_complaint, update_complaint_status,
     add_timeline_entry, resolve_complaint, rate_complaint,
     get_complaints_by_user, get_complaints_by_ward, track_complaint,
