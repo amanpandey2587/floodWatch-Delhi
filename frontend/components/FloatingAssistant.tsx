@@ -162,7 +162,10 @@ export default function FloatingAssistant() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  
+  // — strict mode voice fixes —
   const justStoppedRef = useRef(false);
+  const latestInputRef = useRef("");
 
   const activeBcp47 = LANGUAGES.find((l) => l.code === activeLang)?.bcp47 || "en-IN";
 
@@ -195,6 +198,11 @@ export default function FloatingAssistant() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, interimText]);
+
+  // Keep ref synchronized with input state to prevent stale closures
+  useEffect(() => {
+    latestInputRef.current = input;
+  }, [input]);
 
   // ─── Drag logic ─────────────────────────────────────────────────────────────
   const onDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
@@ -286,15 +294,15 @@ export default function FloatingAssistant() {
     setInterimText("");
   };
 
-  // Auto-send after voice
+  // Auto-send after voice using the updated ref logic
   useEffect(() => {
     if (justStoppedRef.current) {
       justStoppedRef.current = false;
       const t = setTimeout(() => {
-        setInput((current) => {
-          if (current.trim()) sendMessage(current.trim());
-          return "";
-        });
+        const currentText = latestInputRef.current;
+        if (currentText.trim()) {
+          sendMessage(currentText.trim());
+        }
       }, 700);
       return () => clearTimeout(t);
     }
@@ -365,10 +373,11 @@ export default function FloatingAssistant() {
 
     switch (intent.action) {
       case "route": {
-        // Pass via URL params — RouteCalculator reads these on mount
+        // Pass via URL params — FailsafeClient/RouteCalculator reads these on mount
         const params = new URLSearchParams();
         if (intent.route?.origin) params.set("from", intent.route.origin);
         if (intent.route?.destination) params.set("to", intent.route.destination);
+        if ((intent.route as any)?.mode) params.set("mode", (intent.route as any).mode);
         router.push(`/failsafe?${params.toString()}`);
         break;
       }

@@ -10,6 +10,7 @@ export interface RouteIntent {
   destination?: string;
   originCoords?: { lat: number; lng: number };
   destinationCoords?: { lat: number; lng: number };
+  mode?: "driving" | "walking" | "cycling";
 }
 
 export interface ComplaintIntent {

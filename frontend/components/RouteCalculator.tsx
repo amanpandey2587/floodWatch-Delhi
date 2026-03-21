@@ -31,7 +31,7 @@ export default function RouteCalculator({ onRouteCalculate }: RouteCalculatorPro
   const [prefillBanner, setPrefillBanner] = useState<string | null>(null)
 
   // ── Assistant prefill ───────────────────────────────────────────────────────
-  const { origin, destination } = useRoutePrefill()
+  const { origin, destination, mode: prefillMode } = useRoutePrefill()
 
   useEffect(() => {
     if (!origin && !destination) return
@@ -59,10 +59,13 @@ export default function RouteCalculator({ onRouteCalculate }: RouteCalculatorPro
       }
     }
 
+    if (prefillMode && ["driving", "walking", "cycling"].includes(prefillMode)) {
+      messages.push(`Mode: ${prefillMode}`)
+    }
     if (messages.length > 0) {
       setPrefillBanner(`✨ Assistant prefilled — ${messages.join(' · ')}`)
     }
-  }, [origin, destination])
+  }, [origin, destination, prefillMode])
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
   const handleCalculate = async () => {

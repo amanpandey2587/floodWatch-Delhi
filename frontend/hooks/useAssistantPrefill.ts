@@ -31,11 +31,17 @@ export function useRoutePrefill() {
     intent?.route?.destination ||
     null;
 
+  // driving | walking | cycling — detected from speech by the assistant
+  const mode =
+    params.get("mode") ||
+    intent?.route?.mode ||
+    null;
+
   useEffect(() => {
     if (intent?.action === "route") clearIntent();
   }, []); // eslint-disable-line
 
-  return { origin, destination };
+  return { origin, destination, mode };
 }
 
 // ── Complaint prefill ─────────────────────────────────────────────────────────

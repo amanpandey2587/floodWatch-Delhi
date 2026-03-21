@@ -443,14 +443,18 @@ function RoutePanelContent({ onRouteCalculated, onClearRoute }: { onRouteCalcula
   const [prefillBanner, setPrefillBanner] = useState<string | null>(null);
 
   // ── Assistant prefill ──────────────────────────────────────────────────────
-  const { origin, destination } = useRoutePrefill();
+  const { origin, destination, mode: prefillMode } = useRoutePrefill();
 
   useEffect(() => {
     const applied: string[] = [];
     if (origin) { setStartQuery(origin); applied.push(`From: ${origin}`); }
     if (destination) { setEndQuery(destination); applied.push(`To: ${destination}`); }
+    if (prefillMode && ["driving", "walking", "cycling"].includes(prefillMode)) {
+      setProfile(prefillMode);
+      applied.push(`Mode: ${prefillMode}`);
+    }
     if (applied.length > 0) setPrefillBanner(`✨ ${applied.join(' · ')}`);
-  }, [origin, destination]);
+  }, [origin, destination, prefillMode]);
 
   // ── Geocode + route ────────────────────────────────────────────────────────
   const resolveLocation = async (query: string) => {

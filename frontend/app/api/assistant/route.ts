@@ -35,7 +35,8 @@ ALWAYS respond in this format — reply first, then ---JSON---:
   "reply_language": "en|hi|ta|bn|te|pa",
   "route": {
     "origin": "place name or null",
-    "destination": "place name or null"
+    "destination": "place name or null",
+    "mode": "driving|walking|cycling or null"
   },
   "complaint": {
     "location": "place name in English or null",
@@ -55,6 +56,10 @@ ALWAYS respond in this format — reply first, then ---JSON---:
 
 ACTION RULES:
 - "route": user wants directions, navigation, route from A to B, safe path
+  - mode detection: "walking/paidl/paidon se/paidal" → walking, "cycle/cycling/saikil" → cycling, default → driving
+  - Hindi: पैदल → walking, साइकिल → cycling, गाड़ी/ड्राइविंग/कार → driving
+  - Tamil: நடந்து → walking, சைக்கிள் → cycling
+  - Bengali: হেঁটে → walking, সাইকেলে → cycling
 - "complaint": user wants to report flooding, file a complaint, report waterlogging
 - "map": user wants to see the map, check flood risk, find safe parking, fly to a location
 - "ward_risk": user asks about risk level of a specific ward or area
