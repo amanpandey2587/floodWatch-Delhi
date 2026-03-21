@@ -3,7 +3,8 @@ import './globals.css'
 import { AuthProvider } from '@/lib/AuthContext'
 import GlobalHeader from '@/components/GlobalHeader'
 import { Space_Grotesk, Plus_Jakarta_Sans } from 'next/font/google'
-
+import { AssistantProvider } from "@/contexts/AssistantContext";
+import FloatingAssistant from "@/components/FloatingAssistant";
 const spaceGrotesk = Space_Grotesk({
   subsets: ['latin'],
   variable: '--font-display',
@@ -40,7 +41,10 @@ export default function RootLayout({
         </div>
         <AuthProvider>
           <GlobalHeader />
+           <AssistantProvider>  
           {children}
+          <FloatingAssistant />
+           </AssistantProvider>  
         </AuthProvider>
       </body>
     </html>
