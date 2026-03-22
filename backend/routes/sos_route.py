@@ -3,11 +3,11 @@ from pydantic import BaseModel, validator
 from auth.dependencies import get_current_user
 from sos_service import broadcast_sos
 
-router = APIRouter(prefix="/api/sos", tags=["SOS"])
+router = APIRouter(prefix="/sos", tags=["SOS"])
 
 
 class SOSBroadcastRequest(BaseModel):
-    ward_id: str          # ward number as string from frontend
+    ward_id: str
     message: str
 
     @validator("message")
@@ -31,11 +31,7 @@ async def sos_broadcast(
     payload: SOSBroadcastRequest,
     current_user: dict = Depends(get_current_user),
 ):
-
-
-
-    # Only ward_admin or super_admin can broadcast
-    if current_user.get("role") not in ("ward_admin", "super_admin"):
+    if current_user.get("role") not in ("ward_admin", "ward_officer", "super_admin"):
         raise HTTPException(status_code=403, detail="Only ward admins can broadcast SOS alerts")
 
     try:
@@ -51,10 +47,13 @@ async def sos_broadcast(
     )
     return result
 
+
 @router.get("/debug")
 def debug_config():
+    import os
     return {
-        "fast2sms_set": bool(FAST2SMS_API_KEY),
-        "whatsapp_token_set": bool(WHATSAPP_TOKEN),
-        "whatsapp_phone_id_set": bool(WHATSAPP_PHONE_ID),
+        "twilio_account_sid_set": bool(os.getenv("TWILIO_ACCOUNT_SID")),
+        "twilio_auth_token_set":  bool(os.getenv("TWILIO_AUTH_TOKEN")),
+        "twilio_phone_set":       bool(os.getenv("TWILIO_PHONE_NUMBER")),
+        "twilio_whatsapp_set":    bool(os.getenv("TWILIO_WHATSAPP_NUMBER")),
     }
