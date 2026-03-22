@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '@/lib/api';
+import { RefreshCw, Wifi, WifiOff, TrendingUp, MessageSquare, CloudRain, AlertTriangle } from 'lucide-react';
 
 interface WardRisk {
   mention_count: number;
@@ -15,6 +16,7 @@ interface SocialPost {
   text: string;
   ward: string;
   urgency: number;
+  sentiment: number;
   timestamp: string;
 }
 
@@ -25,245 +27,302 @@ interface MonitoringData {
   recent_posts: SocialPost[];
 }
 
-export default function SocialMediaPanel() {
-  const [monitoringData, setMonitoringData] = useState<MonitoringData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedWard, setSelectedWard] = useState<string | null>(null);
-  const [autoRefresh, setAutoRefresh] = useState(false);
+const PLATFORM_LABEL: Record<string, string> = {
+  twitter: 'X',
+  telegram: 'TG',
+  weather: 'WX',
+};
 
-  const fetchMonitoringData = async () => {
+const PLATFORM_COLOR: Record<string, string> = {
+  twitter:  'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900',
+  telegram: 'bg-blue-500 text-white',
+  weather:  'bg-cyan-500 text-white',
+};
+
+function riskColor(v: number) {
+  if (v > 0.7) return { bg: 'bg-red-100 dark:bg-red-950/40',   text: 'text-red-700 dark:text-red-300',   badge: 'bg-red-600 text-white',   label: 'Critical' };
+  if (v > 0.5) return { bg: 'bg-orange-100 dark:bg-orange-950/40', text: 'text-orange-700 dark:text-orange-300', badge: 'bg-orange-500 text-white', label: 'High' };
+  if (v > 0.3) return { bg: 'bg-yellow-100 dark:bg-yellow-950/40', text: 'text-yellow-700 dark:text-yellow-300', badge: 'bg-yellow-500 text-white', label: 'Medium' };
+  return       { bg: 'bg-green-100 dark:bg-green-950/40',   text: 'text-green-700 dark:text-green-300',   badge: 'bg-green-600 text-white',   label: 'Low' };
+}
+
+function timeAgo(ts: string) {
+  const diff = Date.now() - new Date(ts).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+export default function SocialMediaPanel() {
+  const [data, setData]           = useState<MonitoringData | null>(null);
+  const [loading, setLoading]     = useState(false);
+  const [scanning, setScanning]   = useState(false);
+  const [error, setError]         = useState<string | null>(null);
+  const [selectedWard, setSelectedWard] = useState<string | null>(null);
+  const [filterPlatform, setFilterPlatform] = useState<string>('all');
+
+  const fetchStatus = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/social/monitor/status`);
-      const data = await response.json();
-      
-      if (data.status === 'success') {
-        setMonitoringData(data.data);
+      const res = await fetch(`${API_BASE_URL}/api/social/monitor/status`);
+      const json = await res.json();
+      if (json.status === 'success') {
+        setData(json.data);
         setError(null);
       } else {
-        setError(data.message);
+        setError(json.message || 'Unknown error');
       }
-    } catch (err: any) {
-      setError('Failed to fetch monitoring data');
-      console.error(err);
-    }
-  };
-
-  const startMonitoring = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/social/monitor/start?hours_back=24`,
-        { method: 'POST' }
-      );
-      const data = await response.json();
-      
-      if (data.status === 'started') {
-        // Wait a bit then fetch results
-        setTimeout(() => {
-          fetchMonitoringData();
-          setLoading(false);
-        }, 5000);
-      }
-    } catch (err: any) {
-      setError('Failed to start monitoring');
+    } catch (e: any) {
+      setError('Cannot reach server');
+    } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchMonitoringData();
   }, []);
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (autoRefresh) {
-      interval = setInterval(fetchMonitoringData, 60000); // Refresh every minute
+  const startScan = async () => {
+    setScanning(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/social/monitor/start?hours_back=24`, { method: 'POST' });
+      const json = await res.json();
+      if (json.status === 'started') {
+        // Poll for results
+        setTimeout(() => { fetchStatus(); setScanning(false); }, 6000);
+      } else {
+        setScanning(false);
+      }
+    } catch (e: any) {
+      setError('Scan failed');
+      setScanning(false);
     }
-    return () => clearInterval(interval);
-  }, [autoRefresh]);
-
-  const getRiskColor = (riskSpike: number): string => {
-    if (riskSpike > 0.7) return '#e74c3c';
-    if (riskSpike > 0.5) return '#e67e22';
-    if (riskSpike > 0.3) return '#f1c40f';
-    return '#2ecc71';
   };
 
-  const getRiskLabel = (riskSpike: number): string => {
-    if (riskSpike > 0.7) return 'CRITICAL';
-    if (riskSpike > 0.5) return 'HIGH';
-    if (riskSpike > 0.3) return 'MEDIUM';
-    return 'LOW';
-  };
+  // Auto-refresh every 5 min
+  useEffect(() => {
+    fetchStatus();
+    const iv = setInterval(() => fetchStatus(true), 300000);
+    return () => clearInterval(iv);
+  }, [fetchStatus]);
 
-  const getPlatformEmoji = (platform: string): string => {
-    return platform === 'twitter' ? 'X' : 'Air';
-  };
+  const posts = data?.recent_posts.filter(p =>
+    filterPlatform === 'all' || p.platform === filterPlatform
+  ) ?? [];
+
+  const sortedWards = Object.entries(data?.ward_analysis ?? {})
+    .sort(([, a], [, b]) => b.risk_spike - a.risk_spike);
+
+  const criticalCount = sortedWards.filter(([, s]) => s.risk_spike > 0.7).length;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
-      <div className="max-w-6xl mx-auto px-6 py-10">
+      <div className="max-w-6xl mx-auto px-6 py-8">
+
         {/* Header */}
-        <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
+        <div className="flex items-start justify-between flex-wrap gap-4 mb-6">
           <div>
-            <h1 className="text-3xl font-bold">Social Media Monitor</h1>
-            <p className="text-slate-600 dark:text-slate-300 mt-1">
-              Real-time waterlogging alerts and ward risk signals.
+            <h1 className="text-3xl font-bold mb-1">Social Intelligence</h1>
+            <p className="text-slate-500 dark:text-slate-400 text-sm">
+              Live flood signals from X, Telegram &amp; weather data
             </p>
           </div>
-          <button
-            onClick={startMonitoring}
-            disabled={loading}
-            className="px-4 py-2 rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-900 text-sm font-semibold"
-          >
-            {loading ? 'Loading' : 'Scan'}
-          </button>
-        </div>
-
-        {/* Controls */}
-        <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
           <div className="flex items-center gap-2">
-                    {monitoringData && (
-          <div className="text-xs text-slate-500 dark:text-slate-400 text-center">
-            Last updated: {new Date(monitoringData.timestamp).toLocaleTimeString()}
+            <button
+              onClick={() => fetchStatus()}
+              disabled={loading}
+              className="p-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              title="Refresh"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={startScan}
+              disabled={scanning}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              {scanning ? (
+                <><RefreshCw className="w-4 h-4 animate-spin" /> Scanning...</>
+              ) : (
+                <><Wifi className="w-4 h-4" /> Scan Now</>
+              )}
+            </button>
           </div>
-        )}
-          </div>
-          {monitoringData && (
-            <span className="text-sm text-slate-500 dark:text-slate-400">
-              {monitoringData.total_posts} posts analyzed
-            </span>
-          )}
         </div>
 
-      {/* Error Display */}
-      {error && (
-        <div className="mx-4 mt-3 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-xs">
-          {error}
-        </div>
-      )}
-
-      {/* Content */}
-      <div className="space-y-6">
-        {loading && (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
-            <p className="text-sm text-slate-600 dark:text-slate-300">Scanning social media...</p>
+        {/* Error */}
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2">
+            <WifiOff className="w-4 h-4 text-red-600 flex-shrink-0" />
+            <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
           </div>
         )}
 
-        {!loading && monitoringData && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Ward Risk Analysis */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 hover:shadow-lg transition-shadow">
-              <h3 className="font-bold text-sm mb-3">Ward Alerts</h3>
+        {/* Stats bar */}
+        {data && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-1">
+                <MessageSquare className="w-4 h-4 text-blue-500" />
+                <span className="text-xs text-slate-500">Total posts</span>
+              </div>
+              <div className="text-2xl font-bold">{data.total_posts}</div>
+            </div>
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-1">
+                <TrendingUp className="w-4 h-4 text-orange-500" />
+                <span className="text-xs text-slate-500">Wards affected</span>
+              </div>
+              <div className="text-2xl font-bold">{sortedWards.length}</div>
+            </div>
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-1">
+                <AlertTriangle className="w-4 h-4 text-red-500" />
+                <span className="text-xs text-slate-500">Critical wards</span>
+              </div>
+              <div className="text-2xl font-bold text-red-600">{criticalCount}</div>
+            </div>
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-1">
+                <CloudRain className="w-4 h-4 text-cyan-500" />
+                <span className="text-xs text-slate-500">Last scan</span>
+              </div>
+              <div className="text-sm font-medium">{timeAgo(data.timestamp)}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Main content */}
+        {loading && !data ? (
+          <div className="text-center py-16">
+            <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-3 text-blue-500" />
+            <p className="text-slate-500 text-sm">Loading social signals...</p>
+          </div>
+        ) : data ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            {/* Ward risk panel */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
+              <h2 className="font-semibold text-sm mb-4 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-orange-500" />
+                Ward Risk Signals
+              </h2>
               <div className="space-y-2">
-                {Object.entries(monitoringData.ward_analysis)
-                  .sort(([, a], [, b]) => b.risk_spike - a.risk_spike)
-                  .slice(0, 5)
-                  .map(([ward, stats]) => (
+                {sortedWards.length === 0 && (
+                  <p className="text-sm text-slate-400 text-center py-6">No ward signals yet — click Scan Now</p>
+                )}
+                {sortedWards.map(([ward, stats]) => {
+                  const c = riskColor(stats.risk_spike);
+                  const expanded = selectedWard === ward;
+                  return (
                     <div
                       key={ward}
-                      onClick={() => setSelectedWard(selectedWard === ward ? null : ward)}
-                      className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                      onClick={() => setSelectedWard(expanded ? null : ward)}
+                      className={`p-3 rounded-lg cursor-pointer border transition-all ${c.bg} border-transparent hover:border-slate-300 dark:hover:border-slate-600`}
                     >
                       <div className="flex items-center justify-between">
-                        <div className="flex-1">
+                        <div>
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold text-sm">{ward}</span>
-                            <span
-                              className="text-white text-xs px-2 py-0.5 rounded-full font-bold"
-                              style={{ backgroundColor: getRiskColor(stats.risk_spike) }}
-                            >
-                              {getRiskLabel(stats.risk_spike)}
+                            <span className="font-medium text-sm">{ward}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.badge}`}>
+                              {c.label}
                             </span>
                           </div>
-                          <div className="flex gap-3 mt-1 text-xs text-slate-600 dark:text-slate-300">
-                            <span>{stats.mention_count} mentions</span>
-                            <span>Urgency {(stats.avg_urgency * 100).toFixed(0)}%</span>
+                          <div className={`text-xs mt-0.5 ${c.text}`}>
+                            {stats.mention_count} mention{stats.mention_count !== 1 ? 's' : ''} · urgency {Math.round(stats.avg_urgency * 100)}%
                           </div>
                         </div>
-                        <div className="text-2xl font-bold" style={{ color: getRiskColor(stats.risk_spike) }}>
-                          {(stats.risk_spike * 100).toFixed(0)}
+                        <div className={`text-2xl font-bold ${c.text}`}>
+                          {Math.round(stats.risk_spike * 100)}
                         </div>
                       </div>
-
-                      {/* Expanded Details */}
-                      {selectedWard === ward && (
-                        <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-800">
-                          <div className="grid grid-cols-2 gap-2 text-xs">
-                            <div>
-                              <span className="text-slate-500 dark:text-slate-400">Sentiment:</span>
-                              <span className="ml-2 font-semibold">
-                                {stats.avg_sentiment > 0 ? 'Positive' : stats.avg_sentiment < 0 ? 'Negative' : 'Neutral'}
-                                {' '}
-                                {stats.avg_sentiment.toFixed(2)}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-slate-500 dark:text-slate-400">Risk Spike:</span>
-                              <span className="ml-2 font-semibold">
-                                {(stats.risk_spike * 100).toFixed(1)}%
-                              </span>
-                            </div>
-                          </div>
+                      {expanded && (
+                        <div className={`mt-3 pt-3 border-t border-current border-opacity-20 grid grid-cols-3 gap-2 text-xs ${c.text}`}>
+                          <div><span className="opacity-70">Urgency</span><br /><strong>{Math.round(stats.avg_urgency * 100)}%</strong></div>
+                          <div><span className="opacity-70">Sentiment</span><br /><strong>{stats.avg_sentiment > 0 ? '+ ' : ''}{stats.avg_sentiment.toFixed(2)}</strong></div>
+                          <div><span className="opacity-70">Risk score</span><br /><strong>{Math.round(stats.risk_spike * 100)}</strong></div>
                         </div>
                       )}
                     </div>
-                  ))}
+                  );
+                })}
               </div>
             </div>
 
-            {/* Recent Posts */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 hover:shadow-lg transition-shadow">
-              <h3 className="font-bold text-sm mb-3">Recent Posts</h3>
-              <div className="space-y-3">
-                {monitoringData.recent_posts.slice(0, 5).map((post, idx) => (
-                  <div
-                    key={idx}
-                    className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                  >
-                    <div className="flex items-start gap-2">
-                      <span className="text-lg">{getPlatformEmoji(post.platform)}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs text-slate-800 dark:text-slate-100 line-clamp-3 mb-1">
+            {/* Recent posts panel */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-semibold text-sm flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-blue-500" />
+                  Live Posts
+                </h2>
+                {/* Platform filter */}
+                <div className="flex gap-1">
+                  {['all', 'twitter', 'telegram', 'weather'].map(p => (
+                    <button
+                      key={p}
+                      onClick={() => setFilterPlatform(p)}
+                      className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                        filterPlatform === p
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      {p === 'all' ? 'All' : PLATFORM_LABEL[p] || p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
+                {posts.length === 0 && (
+                  <p className="text-sm text-slate-400 text-center py-6">No posts for this filter</p>
+                )}
+                {posts.map((post, i) => {
+                  const c = riskColor(post.urgency);
+                  return (
+                    <div key={i} className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3 border border-slate-100 dark:border-slate-700">
+                      <div className="flex items-start gap-2">
+                        <span className={`text-xs px-1.5 py-0.5 rounded font-bold flex-shrink-0 ${PLATFORM_COLOR[post.platform] || 'bg-slate-200 text-slate-700'}`}>
+                          {PLATFORM_LABEL[post.platform] || post.platform}
+                        </span>
+                        <p className="text-xs text-slate-800 dark:text-slate-100 leading-relaxed flex-1">
                           {post.text}
                         </p>
-                        <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-                          {post.ward && (
-                            <span className="bg-slate-100 dark:bg-slate-900 px-2 py-0.5 rounded">
-                              {post.ward}
-                            </span>
-                          )}
-                          <span
-                            className="px-2 py-0.5 rounded text-white font-semibold"
-                            style={{ backgroundColor: getRiskColor(post.urgency) }}
-                          >
-                            Urgency {(post.urgency * 100).toFixed(0)}%
+                      </div>
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        {post.ward && post.ward !== 'Unknown' && (
+                          <span className="text-xs bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-full">
+                            {post.ward}
                           </span>
-                        </div>
+                        )}
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.badge}`}>
+                          {Math.round(post.urgency * 100)}% urgency
+                        </span>
+                        <span className="text-xs text-slate-400 ml-auto">
+                          {timeAgo(post.timestamp)}
+                        </span>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
-          </div>
-        )}
 
-        {!loading && !monitoringData && !error && (
-          <div className="text-center py-8">
-            <p className="text-slate-500 dark:text-slate-400 text-sm mb-3">No monitoring data available</p>
+          </div>
+        ) : (
+          <div className="text-center py-16">
+            <Wifi className="w-8 h-8 mx-auto mb-3 text-slate-400" />
+            <p className="text-slate-500 text-sm mb-4">No data yet</p>
             <button
-              onClick={startMonitoring}
-              className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-600"
+              onClick={startScan}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
             >
-              Start Monitoring
+              Start Scanning
             </button>
           </div>
         )}
-      </div>
 
       </div>
     </div>
