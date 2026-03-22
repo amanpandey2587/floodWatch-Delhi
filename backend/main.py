@@ -6,6 +6,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 from core.state import state
+from routes.sos_route import router as sos_router
 from routes import (
     auth_routes,
     complaint_routes,
@@ -16,9 +17,9 @@ from routes import (
     safe_parking_routes,
     social_routes
 )
-from fastapi.middleware.gzip import GZipMiddleware
-
-PORT = 8000
+# load_dotenv()
+# PORT = os.getenv("PORT", "8000")
+PORT=8000
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -28,6 +29,7 @@ async def lifespan(app: FastAPI):
     print("Shutting down...")
 
 app = FastAPI(title="Delhi Water-logging API", lifespan=lifespan)
+app.include_router(sos_router, prefix="/api")
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -51,7 +53,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.add_middleware(GZipMiddleware, minimum_size=1000)
+
 
 # Include Routers
 app.include_router(auth_routes.router)
@@ -78,6 +80,10 @@ def read_root():
             "social": "/api/social"
         }
     }
+
+@app.get('/')
+def home():
+    return{"Hello : this is homepage"}
 
 @app.get('/health')
 def health():
