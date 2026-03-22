@@ -659,3 +659,150 @@ class MapController:
         except Exception as e:
             print(f"Geocoding error: {e}")
             return []
+        
+    @staticmethod
+    def get_clusters(severity: str = None):
+        """
+        Returns hotspot cluster polygons from in-memory cache.
+        Optionally filter by severity: Critical / High / Moderate
+        """
+        from core.state import state
+
+        if state.clusters_data is None:
+            raise HTTPException(status_code=503, detail="Cluster data not loaded")
+
+        features = state.clusters_data["features"]
+
+        if severity:
+            features = [
+                f for f in features
+                if f["properties"].get("severity", "").lower() == severity.lower()
+            ]
+
+        return {
+            "type": "FeatureCollection",
+            "features": features,
+            "metadata": {
+                "total": len(features),
+                "severity_filter": severity
+            }
+        }
+
+    @staticmethod
+    def get_isolated_hotspots(risk_min: float = 0.5):
+        """
+        Returns isolated high-risk cells (noise cells from DBSCAN —
+        single-cell flood pockets not part of any cluster).
+        """
+        from core.state import state
+
+        if state.db_engine is None:
+            raise HTTPException(status_code=503, detail="DB not connected")
+
+        cache_key = f"isolated:{risk_min:.2f}"
+        if state.redis:
+            try:
+                cached = state.redis.get(cache_key)
+                if cached:
+                    import json as _json
+                    return _json.loads(cached)
+            except Exception:
+                pass
+
+        try:
+            gdf = gpd.read_postgis(
+                f"""
+                SELECT cell_id, risk_score, village, ward_name, district, geometry
+                FROM isolated_hotspots
+                WHERE risk_score >= {risk_min}
+                ORDER BY risk_score DESC
+                """,
+                con=state.db_engine,
+                geom_col="geometry",
+                crs="EPSG:4326"
+            )
+            result = json.loads(gdf.to_json())
+            result["metadata"] = {"total": len(gdf), "risk_min": risk_min}
+
+            if state.redis:
+                try:
+                    state.redis.setex(cache_key, 3600, json.dumps(result))
+                except Exception:
+                    pass
+
+            return result
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @staticmethod
+    def update_rainfall(rainfall_mm: float, coverage_geojson: dict = None):
+        """
+        Updates rainfall values in the DB for all cells (or cells within
+        a coverage polygon), recomputes risk scores, then refreshes in-memory cache.
+        """
+        from core.state import state
+
+        if state.db_engine is None:
+            raise HTTPException(status_code=503, detail="DB not connected")
+
+        try:
+            with state.db_engine.connect() as conn:
+                if coverage_geojson:
+                    # Update only cells within the rainfall coverage area
+                    conn.execute(text("""
+                        UPDATE grid_cells
+                        SET
+                            rainfall_24h_mm  = :rain,
+                            rainfall_7day_mm = rainfall_7day_mm + :rain,
+                            rainfall_risk    = LEAST(1.0, :rain / 100.0),
+                            risk_score       = (low_elev_risk * 0.35)
+                                             + (drainage_risk * 0.30)
+                                             + (LEAST(1.0, :rain / 100.0) * 0.25)
+                                             + (slope_risk * 0.10),
+                            risk_category    = CASE
+                                WHEN ((low_elev_risk*0.35)+(drainage_risk*0.30)
+                                     +(LEAST(1.0,:rain/100.0)*0.25)+(slope_risk*0.10)) >= 0.6
+                                     THEN 'High'
+                                WHEN ((low_elev_risk*0.35)+(drainage_risk*0.30)
+                                     +(LEAST(1.0,:rain/100.0)*0.25)+(slope_risk*0.10)) >= 0.35
+                                     THEN 'Medium'
+                                ELSE 'Low'
+                            END,
+                            last_updated     = NOW()
+                        WHERE ST_Intersects(
+                            geometry,
+                            ST_SetSRID(ST_GeomFromGeoJSON(:geom), 4326)
+                        )
+                    """), {"rain": rainfall_mm, "geom": json.dumps(coverage_geojson)})
+                else:
+                    # Update all cells
+                    conn.execute(text("""
+                        UPDATE grid_cells
+                        SET
+                            rainfall_24h_mm  = :rain,
+                            rainfall_7day_mm = rainfall_7day_mm + :rain,
+                            rainfall_risk    = LEAST(1.0, :rain / 100.0),
+                            risk_score       = (low_elev_risk * 0.35)
+                                             + (drainage_risk * 0.30)
+                                             + (LEAST(1.0, :rain / 100.0) * 0.25)
+                                             + (slope_risk * 0.10),
+                            risk_category    = CASE
+                                WHEN ((low_elev_risk*0.35)+(drainage_risk*0.30)
+                                     +(LEAST(1.0,:rain/100.0)*0.25)+(slope_risk*0.10)) >= 0.6
+                                     THEN 'High'
+                                WHEN ((low_elev_risk*0.35)+(drainage_risk*0.30)
+                                     +(LEAST(1.0,:rain/100.0)*0.25)+(slope_risk*0.10)) >= 0.35
+                                     THEN 'Medium'
+                                ELSE 'Low'
+                            END,
+                            last_updated     = NOW()
+                        WHERE TRUE
+                    """), {"rain": rainfall_mm})
+                conn.commit()
+
+            # Refresh in-memory cache so next API call gets updated data
+            state.refresh_grid_from_db()
+            return {"success": True, "rainfall_mm": rainfall_mm}
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))

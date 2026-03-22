@@ -2,6 +2,8 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from typing import List
 from controllers.map_controller import MapController
+from fastapi import APIRouter, HTTPException
+from core.state import state
 
 router = APIRouter(tags=["Map & Analysis"])
 
@@ -131,3 +133,50 @@ def get_alternative_routes(
     profile: str = "driving"
 ):
     return MapController.get_alternative_routes(start_lat, start_lon, end_lat, end_lon, profile)
+
+
+@router.get("/api/clusters")
+def get_clusters(severity: str = None):
+    return MapController.get_clusters(severity=severity)
+
+@router.get("/api/isolated-hotspots")
+def get_isolated_hotspots(risk_min: float = 0.5):
+    return MapController.get_isolated_hotspots(risk_min=risk_min)
+
+@router.post("/api/update-rainfall")
+def update_rainfall(payload: dict):
+    return MapController.update_rainfall(
+        rainfall_mm=payload.get("rainfall_mm", 0),
+        coverage_geojson=payload.get("coverage_geojson")
+    )
+
+
+@router.get("/api/village-boundaries")
+def get_village_boundaries():
+    """Returns village polygons as GeoJSON — loaded from KML at startup."""
+    if state.wards_data is None:
+        raise HTTPException(status_code=503, detail="Village data not loaded")
+    return state.wards_data
+
+
+@router.get("/api/village-preparedness")
+def get_village_preparedness(level: str = None):
+    """
+    Returns village polygons with preparedness scores.
+    Optional ?level=Critical+gap to filter by level.
+    """
+    if state.wards_data is None:
+        raise HTTPException(status_code=503, detail="Village data not loaded")
+
+    features = state.wards_data["features"]
+    if level:
+        features = [
+            f for f in features
+            if f["properties"].get("PREP_LEVEL", "") == level
+        ]
+
+    return {
+        "type": "FeatureCollection",
+        "features": features,
+        "metadata": {"total": len(features), "level_filter": level}
+    }
