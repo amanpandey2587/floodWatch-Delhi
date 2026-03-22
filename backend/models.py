@@ -216,7 +216,12 @@ class UserModel:
         
         result = users_collection.insert_one(user_data)
         return user_id
-    
+    @staticmethod
+    def find_all() -> List[Dict[str, Any]]:
+        users = list(users_collection.find({}))
+        for user in users:
+            user["_id"] = str(user["_id"])
+        return users
     @staticmethod
     def find_by_email(email: str) -> Optional[Dict[str, Any]]:
         """Find user by email"""

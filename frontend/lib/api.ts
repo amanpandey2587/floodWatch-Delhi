@@ -2,7 +2,7 @@
 
 import axios from 'axios';
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://geomap.api-easy-eats-canteen.sbs';
+export const API_BASE_URL = "http://localhost:8000";
 
 // Helper to get auth token from localStorage
 function getAuthToken(): string | null {

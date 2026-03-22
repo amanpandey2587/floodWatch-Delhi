@@ -6,6 +6,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 from core.state import state
+from routes.sos_route import router as sos_router
 from routes import (
     auth_routes,
     complaint_routes,
@@ -27,7 +28,7 @@ async def lifespan(app: FastAPI):
     print("Shutting down...")
 
 app = FastAPI(title="Delhi Water-logging API", lifespan=lifespan)
-
+app.include_router(sos_router, prefix="/api")
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
