@@ -74,9 +74,6 @@ def get_crowdsource_reports(rainfall_intensity: float = 50.0):
     reports = MapController.get_crowdsource_reports(rainfall_intensity)["reports"]
     return CrowdsourceResponse(reports=reports)
 
-@router.post("/api/sos/broadcast")
-def broadcast_sos(request: SOSRequest):
-    return MapController.broadcast_sos(request.ward_id, request.message)
 
 @router.get("/api/route")
 async def get_route(

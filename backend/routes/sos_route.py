@@ -35,7 +35,7 @@ async def sos_broadcast(
         raise HTTPException(status_code=403, detail="Only ward admins can broadcast SOS alerts")
 
     try:
-        ward_number = int(payload.ward_id)
+        ward_number = int(payload.ward_id[-3:])
     except ValueError:
         raise HTTPException(status_code=422, detail="ward_id must be a numeric ward number")
 
