@@ -1,4 +1,4 @@
-from fastapi import HTTPException
+from fastapi import HTTPException,Query
 import numpy as np
 import requests
 import time
@@ -11,7 +11,7 @@ from utils.hotspots import HOTSPOTS
 from utils.wards import WARDS, LANDMARKS
 from utils.crowdsource import generate_crowdsource_reports
 from utils.preparedness import calculate_ward_preparedness
-from shapely.geometry import LineString
+from shapely.geometry import LineString,Point
 
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
 
@@ -377,6 +377,7 @@ class MapController:
             "residents_notified": contacts_count,
             "timestamp": int(time.time()),
         }
+    
     @staticmethod
     def get_grid_data(
         limit: int = None,
@@ -806,3 +807,5 @@ class MapController:
 
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+
+    
