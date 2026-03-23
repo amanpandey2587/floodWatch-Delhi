@@ -1,9 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, Polyline, Polygon, useMap } from 'react-leaflet'
-import { divIcon } from 'leaflet'
+import { useEffect, useRef } from 'react'
+import {
+  MapContainer, TileLayer, Marker, Popup,
+  Polyline, Polygon, useMap,
+} from 'react-leaflet'
+import L, { divIcon } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+
+// ── Interfaces ─────────────────────────────────────────────────────────────────
 
 interface HotspotPrediction {
   id: number
@@ -50,86 +55,166 @@ interface EnhancedMapProps {
   rainfallIntensity: number
   wards: Ward[]
   crowdsourceReports: CrowdsourceReport[]
+  villagePreparedness: any | null
+  prepFilter: string | null
 }
 
-const createIcon = (color: string) => {
-  return divIcon({
-    className: 'custom-marker',
+// ── Icons ──────────────────────────────────────────────────────────────────────
+
+const mkIcon = (color: string) =>
+  divIcon({
+    className: '',
     html: `<div style="
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      background-color: ${color};
-      border: 2px solid white;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-      cursor: pointer;
+      width:24px;height:24px;border-radius:50%;
+      background:${color};border:2px solid white;
+      box-shadow:0 2px 4px rgba(0,0,0,0.3)
     "></div>`,
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
+    iconSize:    [24, 24],
+    iconAnchor:  [12, 12],
     popupAnchor: [0, -12],
   })
-}
 
-const safeIcon = createIcon('#10b981')
-const warningIcon = createIcon('#f59e0b')
-const criticalIcon = createIcon('#ef4444')
-
-const createCrowdsourceIcon = (severity: number) => {
-  const colors = ['#3b82f6', '#f59e0b', '#ef4444']
-  const color = colors[severity] || colors[0]
-  return divIcon({
-    className: 'crowdsource-marker',
+const mkCsIcon = (sev: number) =>
+  divIcon({
+    className: '',
     html: `<div style="
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background-color: ${color};
-      border: 2px solid white;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.4);
-      animation: pulse 2s infinite;
+      width:16px;height:16px;border-radius:50%;
+      background:${(['#3b82f6', '#f59e0b', '#ef4444'] as const)[sev] ?? '#3b82f6'};
+      border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.4)
     "></div>`,
-    iconSize: [16, 16],
-    iconAnchor: [8, 8],
+    iconSize:    [16, 16],
+    iconAnchor:  [8, 8],
     popupAnchor: [0, -8],
   })
-}
 
-const toRadians = (deg: number) => (deg * Math.PI) / 180
+const safeIcon     = mkIcon('#10b981')
+const warningIcon  = mkIcon('#f59e0b')
+const criticalIcon = mkIcon('#ef4444')
 
-const haversineMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-  const R = 6371000
-  const dLat = toRadians(lat2 - lat1)
-  const dLon = toRadians(lon2 - lon1)
+// ── Geo helpers ────────────────────────────────────────────────────────────────
+
+const toRad = (d: number) => (d * Math.PI) / 180
+
+const haversine = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R    = 6_371_000
+  const dLat = toRad(lat2 - lat1)
+  const dLon = toRad(lon2 - lon1)
   const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2)
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  return R * c
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t
 
-const gradientColor = (distanceM: number) => {
-  const maxDistance = 1200
-  const t = Math.max(0, Math.min(1, 1 - distanceM / maxDistance))
-  const blue = { r: 59, g: 130, b: 246 }
-  const red = { r: 239, g: 68, b: 68 }
-  const r = Math.round(lerp(blue.r, red.r, t))
-  const g = Math.round(lerp(blue.g, red.g, t))
-  const b = Math.round(lerp(blue.b, red.b, t))
-  return `rgb(${r}, ${g}, ${b})`
+const gradColor = (m: number) => {
+  const t = Math.max(0, Math.min(1, 1 - m / 1200))
+  return `rgb(${Math.round(lerp(59, 239, t))},${Math.round(lerp(130, 68, t))},${Math.round(lerp(246, 68, t))})`
 }
 
-function TrafficOverlay({ rainfallIntensity, showTraffic }: { rainfallIntensity: number; showTraffic: boolean }) {
-  const map = useMap()
-  
+// ── VillageLayer ───────────────────────────────────────────────────────────────
+// Uses native Leaflet L.geoJSON — bypasses react-leaflet GeoJSON abstraction
+// which silently drops popup bindings in Next.js SSR environments.
+
+function VillageLayer({
+  data,
+  prepFilter,
+}: {
+  data: any
+  prepFilter: string | null
+}) {
+  const map      = useMap()
+  const layerRef = useRef<L.GeoJSON | null>(null)
+
   useEffect(() => {
-    if (!showTraffic) return
-  }, [showTraffic, rainfallIntensity, map])
-  
+    // Remove previous layer before adding new one
+    if (layerRef.current) {
+      layerRef.current.removeFrom(map)
+      layerRef.current = null
+    }
+
+    if (!data?.features?.length) {
+      console.log('[VillageLayer] no data or empty features array')
+      return
+    }
+
+    console.log('[VillageLayer] rendering', data.features.length, 'villages')
+
+    const geoLayer = L.geoJSON(data, {
+      style: (feature: any) => ({
+        fillColor:   feature?.properties?.PREP_COLOR ?? '#888888',
+        fillOpacity: 0.35,
+        color:       '#475569',
+        weight:      1.5,
+        opacity:     0.8,
+      }),
+
+      onEachFeature: (feature: any, layer: L.Layer) => {
+        const p = feature.properties
+        if (!p) return
+
+        // Click log — tells us if events are firing
+        layer.on('click', () => {
+          console.log('[Village clicked]', {
+            village:    p.VILLAGE,
+            level:      p.PREP_LEVEL,
+            score:      p.PREP_SCORE,
+            district:   p.DISTRICT,
+            desilting:  p.DESILTING_PCT,
+            highRisk:   p.HIGH_RISK_CELLS,
+            total:      p.TOTAL_CELLS,
+            actions:    p.ACTIONS,
+          })
+        })
+
+        layer.bindPopup(`
+          <div style="
+            min-width:190px;
+            font-size:12px;
+            line-height:1.9;
+            font-family:sans-serif;
+            padding:2px
+          ">
+            <div style="font-size:14px;font-weight:700;margin-bottom:2px">
+              ${p.PREP_LEVEL === 'Prepared' ? '✓' : '⚠'}&nbsp;${p.VILLAGE ?? '—'}
+            </div>
+            <div style="color:${p.PREP_COLOR ?? '#888'};font-weight:600">
+              ${p.PREP_LEVEL ?? '—'}&nbsp;·&nbsp;${p.PREP_SCORE != null ? Number(p.PREP_SCORE).toFixed(1) : '—'}/100
+            </div>
+            <hr style="margin:5px 0;border:none;border-top:1px solid #e2e8f0"/>
+            Tehsil:&nbsp;<b>${p.TEHSIL ?? '—'}</b><br/>
+            District:&nbsp;<b>${p.DISTRICT ?? '—'}</b><br/>
+            Desilting:&nbsp;<b>${p.DESILTING_PCT ?? '—'}%</b><br/>
+            High-risk cells:&nbsp;<b>${p.HIGH_RISK_CELLS ?? 0}&nbsp;/&nbsp;${p.TOTAL_CELLS ?? 0}</b><br/>
+            <div style="
+              margin-top:6px;
+              padding:4px 8px;
+              background:#fef3c7;
+              border-radius:6px;
+              color:#92400e;
+              font-size:11px;
+              line-height:1.5
+            ">
+              ${p.ACTIONS ?? 'No critical gaps identified'}
+            </div>
+          </div>
+        `, { maxWidth: 300 })
+      },
+    })
+
+    geoLayer.addTo(map)
+    layerRef.current = geoLayer
+
+    return () => {
+      geoLayer.removeFrom(map)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, prepFilter])
+
   return null
 }
+
+// ── Main component ─────────────────────────────────────────────────────────────
 
 export default function EnhancedMap({
   hotspots,
@@ -140,107 +225,86 @@ export default function EnhancedMap({
   rainfallIntensity,
   wards,
   crowdsourceReports,
+  villagePreparedness,
+  prepFilter,
 }: EnhancedMapProps) {
-  const getIcon = (riskLevel: number) => {
-    switch (riskLevel) {
-      case 0:
-        return safeIcon
-      case 1:
-        return warningIcon
-      case 2:
-        return criticalIcon
-      default:
-        return safeIcon
-    }
-  }
 
-  const getRiskLabel = (riskLevel: number) => {
-    switch (riskLevel) {
-      case 0:
-        return 'Safe'
-      case 1:
-        return 'Warning'
-      case 2:
-        return 'Critical'
-      default:
-        return 'Unknown'
-    }
-  }
+  const getIcon   = (l: number) => l === 2 ? criticalIcon : l === 1 ? warningIcon : safeIcon
+  const riskLabel = (l: number) => (['Safe', 'Warning', 'Critical'] as const)[l] ?? 'Unknown'
+  const wardColor = (s: number) =>
+    s >= 80 ? 'rgba(16,185,129,0.4)' : s >= 60 ? 'rgba(245,158,11,0.4)' : 'rgba(239,68,68,0.4)'
 
-  const getWardColor = (score: number) => {
-    if (score >= 80) return 'rgba(16, 185, 129, 0.4)'
-    if (score >= 60) return 'rgba(245, 158, 11, 0.4)'
-    return 'rgba(239, 68, 68, 0.4)'
-  }
+  const riskHotspots = hotspots.filter(h => h.risk_level > 0)
+  const routeColor   = route?.warnings.length ? '#ef4444' : '#3b82f6'
 
-  const getRouteColor = () => {
-    if (!route || route.warnings.length === 0) return '#3b82f6'
-    return '#ef4444'
-  }
-
-  const riskHotspots = hotspots.filter((h) => h.risk_level > 0)
-  const routeSegments = route && route.route.length > 1
-    ? route.route.slice(0, -1).map((point, idx) => {
-        const next = route.route[idx + 1]
-        const midLat = (point[0] + next[0]) / 2
-        const midLng = (point[1] + next[1]) / 2
-        let nearest = Number.POSITIVE_INFINITY
-        riskHotspots.forEach((h) => {
-          const d = haversineMeters(midLat, midLng, h.lat, h.lng)
-          if (d < nearest) nearest = d
+  const routeSegs =
+    route && route.route.length > 1
+      ? route.route.slice(0, -1).map((pt, i) => {
+          const nx   = route.route[i + 1]
+          const mLat = (pt[0] + nx[0]) / 2
+          const mLng = (pt[1] + nx[1]) / 2
+          let near   = Infinity
+          riskHotspots.forEach(h => {
+            const d = haversine(mLat, mLng, h.lat, h.lng)
+            if (d < near) near = d
+          })
+          return {
+            positions: [pt, nx] as [number, number][],
+            color: riskHotspots.length ? gradColor(near) : routeColor,
+          }
         })
-        const color = riskHotspots.length > 0 ? gradientColor(nearest) : getRouteColor()
-        return { positions: [point, next], color }
-      })
-    : []
+      : []
+
+  console.log('[EnhancedMap] villagePreparedness:', villagePreparedness?.features?.length ?? 'null')
 
   return (
     <div className="w-full h-full">
       <MapContainer
-        center={[28.6139, 77.2090]}
+        center={[28.6139, 77.209]}
         zoom={11}
         style={{ height: '100%', width: '100%' }}
-        className="z-0"
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        
-        <TrafficOverlay rainfallIntensity={rainfallIntensity} showTraffic={showTraffic} />
 
-        {showWards && wards.map((ward) => (
+        {/* Village preparedness — imperative native Leaflet layer */}
+        <VillageLayer data={villagePreparedness} prepFilter={prepFilter} />
+
+        {/* Ward polygons */}
+        {showWards && wards.map(w => (
           <Polygon
-            key={ward.id}
-            positions={ward.bounds}
+            key={w.id}
+            positions={w.bounds}
             pathOptions={{
-              color: getWardColor(ward.preparedness_score),
-              fillColor: getWardColor(ward.preparedness_score),
+              color:       wardColor(w.preparedness_score),
+              fillColor:   wardColor(w.preparedness_score),
               fillOpacity: 0.3,
-              weight: 2,
+              weight:      2,
             }}
           >
             <Popup>
               <div className="p-2 min-w-[200px]">
-                <h3 className="font-bold text-lg mb-2">{ward.name}</h3>
+                <h3 className="font-bold text-base mb-2">{w.name}</h3>
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-slate-600 dark:text-slate-300">Preparedness:</span>
-                    <span className="font-semibold">{ward.preparedness_score}%</span>
+                    <span className="text-slate-500">Preparedness</span>
+                    <span className="font-semibold">{w.preparedness_score}%</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-600 dark:text-slate-300">Pumps:</span>
-                    <span className="font-semibold">{ward.pumps_available}/{ward.pumps_total}</span>
+                    <span className="text-slate-500">Pumps</span>
+                    <span className="font-semibold">{w.pumps_available}/{w.pumps_total}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-600 dark:text-slate-300">Drains Desilted:</span>
-                    <span className={ward.drains_desilted ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
-                      {ward.drains_desilted ? 'Yes' : 'No'}
+                    <span className="text-slate-500">Drains desilted</span>
+                    <span className={w.drains_desilted ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
+                      {w.drains_desilted ? 'Yes' : 'No'}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-600 dark:text-slate-300">Emergency Contacts:</span>
-                    <span className="font-semibold">{ward.emergency_contacts}</span>
+                    <span className="text-slate-500">Emergency contacts</span>
+                    <span className="font-semibold">{w.emergency_contacts}</span>
                   </div>
                 </div>
               </div>
@@ -248,47 +312,35 @@ export default function EnhancedMap({
           </Polygon>
         ))}
 
-        {routeSegments.map((segment, idx) => (
+        {/* Route polyline */}
+        {routeSegs.map((s, i) => (
           <Polyline
-            key={`route-seg-${idx}`}
-            positions={segment.positions}
-            pathOptions={{
-              color: segment.color,
-              weight: 5,
-              opacity: 0.9,
-            }}
+            key={`route-${i}`}
+            positions={s.positions}
+            pathOptions={{ color: s.color, weight: 5, opacity: 0.9 }}
           />
         ))}
 
-        {hotspots.map((hotspot) => (
-          <Marker
-            key={hotspot.id}
-            position={[hotspot.lat, hotspot.lng]}
-            icon={getIcon(hotspot.risk_level)}
-          >
+        {/* Hotspot markers */}
+        {hotspots.map(h => (
+          <Marker key={h.id} position={[h.lat, h.lng]} icon={getIcon(h.risk_level)}>
             <Popup>
-              <div className="p-2 min-w-[200px]">
-                <h3 className="font-bold text-lg mb-1">{hotspot.name}</h3>
-                <div className="space-y-1 text-sm">
+              <div className="p-2 min-w-[180px]">
+                <h3 className="font-bold mb-1">{h.name}</h3>
+                <div className="text-sm space-y-1">
                   <div className="flex justify-between">
-                    <span className="text-slate-600 dark:text-slate-300">Risk Level:</span>
-                    <span
-                      className={`font-semibold ${
-                        hotspot.risk_level === 0
-                          ? 'text-green-600'
-                          : hotspot.risk_level === 1
-                          ? 'text-orange-600'
-                          : 'text-red-600'
-                      }`}
-                    >
-                      {getRiskLabel(hotspot.risk_level)}
+                    <span className="text-slate-500">Risk</span>
+                    <span className={`font-semibold ${
+                      h.risk_level === 0 ? 'text-green-600'
+                      : h.risk_level === 1 ? 'text-orange-600'
+                      : 'text-red-600'
+                    }`}>
+                      {riskLabel(h.risk_level)}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-600 dark:text-slate-300">Probability:</span>
-                    <span className="font-semibold">
-                      {(hotspot.probability * 100).toFixed(1)}%
-                    </span>
+                    <span className="text-slate-500">Probability</span>
+                    <span className="font-semibold">{(h.probability * 100).toFixed(1)}%</span>
                   </div>
                 </div>
               </div>
@@ -296,27 +348,23 @@ export default function EnhancedMap({
           </Marker>
         ))}
 
-        {showCrowdsource && crowdsourceReports.map((report) => (
-          <Marker
-            key={report.id}
-            position={[report.lat, report.lng]}
-            icon={createCrowdsourceIcon(report.severity)}
-          >
+        {/* Crowdsource markers */}
+        {showCrowdsource && crowdsourceReports.map(r => (
+          <Marker key={r.id} position={[r.lat, r.lng]} icon={mkCsIcon(r.severity)}>
             <Popup>
-              <div className="p-2 min-w-[200px]">
-                <div className="text-sm text-slate-700 dark:text-slate-200">
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <span className="text-xs text-slate-500 dark:text-slate-400">
-                      {new Date(report.timestamp * 1000).toLocaleTimeString()}
-                    </span>
-                  </div>
-                  <p className="font-medium">{report.message}</p>
+              <div className="p-2 min-w-[180px] text-sm">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-2 h-2 rounded-full bg-blue-500" />
+                  <span className="text-xs text-slate-400">
+                    {new Date(r.timestamp * 1000).toLocaleTimeString()}
+                  </span>
                 </div>
+                <p className="font-medium">{r.message}</p>
               </div>
             </Popup>
           </Marker>
         ))}
+
       </MapContainer>
     </div>
   )

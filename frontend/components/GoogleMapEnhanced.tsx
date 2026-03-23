@@ -50,6 +50,7 @@ interface GoogleMapEnhancedProps {
   crowdsourceReports: CrowdsourceReport[]
   mapMode: 'standard' | '3d' | 'streetview'
   onMapModeChange?: (mode: 'standard' | '3d' | 'streetview') => void
+  villagePreparedness: any | null   // ← add this
 }
 
 const containerStyle = {
@@ -102,6 +103,7 @@ export default function GoogleMapEnhanced({
   crowdsourceReports,
   mapMode,
   onMapModeChange,
+  villagePreparedness,   // ← add this
 }: GoogleMapEnhancedProps) {
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script', // MUST be same everywhere
@@ -142,28 +144,6 @@ export default function GoogleMapEnhanced({
     }
   }, [mapMode, map])
 
-  // Handle Street View mode
-  useEffect(() => {
-    if (!map || mapMode !== 'streetview') return
-
-    const panorama = map.getStreetView()
-    if (panorama) {
-      streetViewRef.current = panorama
-      setStreetView(panorama)
-      panorama.setPosition(center)
-      panorama.setPov({
-        heading: 34,
-        pitch: 10
-      })
-      panorama.setVisible(true)
-    }
-
-    return () => {
-      if (panorama) {
-        panorama.setVisible(false)
-      }
-    }
-  }, [mapMode, map])
 
   // Handle traffic layer
   useEffect(() => {
@@ -241,6 +221,91 @@ export default function GoogleMapEnhanced({
     }
   }, [showWards, wards, map])
 
+// Street View useEffect — clean version, no nested hook
+useEffect(() => {
+  if (!map || mapMode !== 'streetview') return;
+
+  const panorama = map.getStreetView();
+  if (panorama) {
+    streetViewRef.current = panorama;
+    setStreetView(panorama);
+    panorama.setPosition(center);
+    panorama.setPov({ heading: 34, pitch: 10 });
+    panorama.setVisible(true);
+  }
+
+  return () => {
+    if (panorama) panorama.setVisible(false);
+  };
+}, [mapMode, map]);
+
+// Village preparedness useEffect — separate, top-level
+useEffect(() => {
+  if (!map || !villagePreparedness?.features?.length) return;
+
+  const infoWindow = new google.maps.InfoWindow();
+  const polygons: google.maps.Polygon[] = [];
+
+  villagePreparedness.features.forEach((feature: any) => {
+    const p     = feature.properties;
+    const color = p.PREP_COLOR ?? '#888888';
+    const geom  = feature.geometry;
+    if (!geom) return;
+
+    const ringGroups: number[][][] =
+      geom.type === 'MultiPolygon'
+        ? geom.coordinates.map((poly: number[][][]) => poly[0])
+        : [geom.coordinates[0]];
+
+    ringGroups.forEach(ring => {
+      if (!ring?.length) return;
+const paths = ring.map((coord: number[]) => ({
+  lat: coord[1],
+  lng: coord[0],
+}));
+      const polygon = new google.maps.Polygon({
+        paths,
+        strokeColor:   color,
+        strokeOpacity: 0.8,
+        strokeWeight:  1.5,
+        fillColor:     color,
+        fillOpacity:   0.35,
+        map,
+        zIndex:        1,
+        clickable:     true,
+      });
+
+      polygon.addListener('click', (event: google.maps.MapMouseEvent) => {
+        if (!event.latLng) return;
+        infoWindow.setContent(`
+          <div style="min-width:180px;font-size:12px;line-height:1.8;font-family:sans-serif">
+            <b style="font-size:14px">${p.VILLAGE ?? '—'}</b><br/>
+            <span style="color:${color};font-weight:600">${p.PREP_LEVEL ?? '—'}</span>
+            &nbsp;·&nbsp;<b>${p.PREP_SCORE?.toFixed(1) ?? '—'}</b>/100<br/>
+            <hr style="margin:4px 0;border-color:#eee"/>
+            Tehsil: ${p.TEHSIL ?? '—'}<br/>
+            District: ${p.DISTRICT ?? '—'}<br/>
+            Desilting: ${p.DESILTING_PCT ?? '—'}%<br/>
+            High-risk cells: ${p.HIGH_RISK_CELLS ?? 0} / ${p.TOTAL_CELLS ?? 0}<br/>
+            <div style="margin-top:4px;padding:4px 6px;background:#fef3c7;
+                        border-radius:4px;color:#92400e;font-size:11px">
+              ${p.ACTIONS ?? 'No critical gaps'}
+            </div>
+          </div>
+        `);
+        infoWindow.setPosition(event.latLng);
+        infoWindow.open(map);
+      });
+
+      polygons.push(polygon);
+    });
+  });
+
+  return () => {
+    polygons.forEach(p => p.setMap(null));
+    infoWindow.close();
+  };
+}, [villagePreparedness, map]);
   const getWardColor = (score: number) => {
     if (score >= 80) return '#10b981'
     if (score >= 60) return '#f59e0b'
@@ -422,15 +487,12 @@ export default function GoogleMapEnhanced({
 
       {/* Route Polyline */}
       {routeSegments.map((segment, idx) => (
+        
         <Polyline
-          key={`route-seg-${idx}`}
-          path={segment.path}
-          options={{
-            strokeColor: segment.color,
-            strokeOpacity: 0.9,
-            strokeWeight: 5,
-          }}
-        />
+  key={`route-seg-${idx}`}
+  path={segment.path}   // ← must be 'path' not 'positions'
+  options={{ strokeColor: segment.color, strokeOpacity: 0.9, strokeWeight: 5 }}
+/>
       ))}
     </GoogleMap>
   )

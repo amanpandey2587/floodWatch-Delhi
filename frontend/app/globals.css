@@ -135,3 +135,12 @@ body {
 .dark .text-gray-700 { color: rgb(203 213 225 / 1); }
 .dark .text-gray-800 { color: rgb(226 232 240 / 1); }
 .dark .text-gray-900 { color: rgb(241 245 249 / 1); }
+
+
+/* Leaflet popup z-index fix */
+.leaflet-pane         { z-index: 400  !important; }
+.leaflet-popup-pane   { z-index: 700  !important; }
+.leaflet-popup        { z-index: 700  !important; }
+.leaflet-control-pane { z-index: 800  !important; }
+.leaflet-top,
+.leaflet-bottom       { z-index: 1000 !important; }

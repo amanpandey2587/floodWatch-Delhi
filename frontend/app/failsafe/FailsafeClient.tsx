@@ -3,38 +3,42 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { API_BASE_URL, useSafeParkingAPI } from '@/lib/api';
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
+  Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from '@/components/ui/accordion';
 import {
-  GoogleMap,
-  useJsApiLoader,
-  Polyline,
-  Marker,
-  InfoWindow,
-  Circle,
+  GoogleMap, useJsApiLoader, Polyline, Marker, InfoWindow, Circle,
 } from '@react-google-maps/api';
 import { GoogleMapsOverlay } from '@deck.gl/google-maps';
 import { GeoJsonLayer } from '@deck.gl/layers';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Libraries array defined OUTSIDE component as a stable constant.
-// If defined inline → new array reference every render → useJsApiLoader
-// treats it as a change → full Google Maps remount → blank map flash.
-// ─────────────────────────────────────────────────────────────────────────────
 const GOOGLE_MAPS_LIBRARIES: ('places' | 'visualization')[] = ['places', 'visualization'];
+const ZOOM_THRESHOLD = 13;
+const mapContainerStyle = { width: '100%', height: '100%' };
+const center = { lat: 28.67, lng: 77.30 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────────────────────
+const mapOptions: google.maps.MapOptions = {
+  zoom: 12,
+  mapTypeId: 'roadmap',
+  disableDefaultUI: false,
+  zoomControl: true,
+  streetViewControl: true,
+  fullscreenControl: true,
+  styles: [
+    { elementType: 'geometry',        stylers: [{ saturation: -60 }] },
+    { featureType: 'poi',             stylers: [{ visibility: 'off' }] },
+    { featureType: 'transit',         stylers: [{ visibility: 'off' }] },
+    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#b8d4e8' }] },
+    { elementType: 'labels.text.fill', stylers: [{ color: '#9e9e9e' }] },
+  ],
+};
 
 interface MapData {
   grid: any;
   wards: any;
   drains: any;
   stats: any;
+  clusters: any;
+  isolatedHotspots: any;
 }
 
 interface ParkingLocation {
@@ -51,63 +55,28 @@ interface ParkingLocation {
   distance_km?: number;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────────────────────────────────────
-
-const mapContainerStyle = { width: '100%', height: '100%' };
-const center            = { lat: 28.67, lng: 77.30 };
-
-const mapOptions: google.maps.MapOptions = {
-  zoom:              12,
-  mapTypeId:         'roadmap',
-  disableDefaultUI:  false,
-  zoomControl:       true,
-  streetViewControl: true,
-  fullscreenControl: true,
-  styles: [
-    { elementType: 'geometry',         stylers: [{ saturation: -60 }] },
-    { featureType: 'poi',              stylers: [{ visibility: 'off' }] },
-    { featureType: 'transit',          stylers: [{ visibility: 'off' }] },
-    { featureType: 'water',
-      elementType: 'geometry',         stylers: [{ color: '#b8d4e8' }] },
-    { elementType: 'labels.text.fill', stylers: [{ color: '#9e9e9e' }] },
-  ],
-};
-
-// Below this zoom → city overview, fetch from API
-// At or above this zoom → filter cached data client-side, no network call
-const ZOOM_THRESHOLD = 13;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Main component
-// ─────────────────────────────────────────────────────────────────────────────
-
 export default function WaterloggingMap() {
   const safeParkingAPI = useSafeParkingAPI();
 
-  // ── State ──────────────────────────────────────────────────────────────────
-  const [mapData, setMapData]                   = useState<MapData | null>(null);
-  const [loading, setLoading]                   = useState(true);
-  const [error, setError]                       = useState<string | null>(null);
-  const [filterRisk, setFilterRisk]             = useState(0);
-  const [routeData, setRouteData]               = useState<any>(null);
-  const [selectedGrid, setSelectedGrid]         = useState<any>(null);
-  const [selectedGridPos, setSelectedGridPos]   = useState<google.maps.LatLngLiteral | null>(null);
-  const [selectedRoute, setSelectedRoute]       = useState(false);
-  const [selectedStart, setSelectedStart]       = useState(false);
-  const [selectedEnd, setSelectedEnd]           = useState(false);
-  const [selectedSegment, setSelectedSegment]   = useState<number | null>(null);
-
-  const [parkingLat, setParkingLat]             = useState('');
-  const [parkingLon, setParkingLon]             = useState('');
-  const [parkingRadius, setParkingRadius]       = useState('2000');
-  const [parkingLimit, setParkingLimit]         = useState('3');
-  const [parkingLoading, setParkingLoading]     = useState(false);
-  const [parkingError, setParkingError]         = useState<string | null>(null);
+  const [mapData, setMapData]                 = useState<MapData | null>(null);
+  const [loading, setLoading]                 = useState(true);
+  const [error, setError]                     = useState<string | null>(null);
+  const [filterRisk, setFilterRisk]           = useState(0);
+  const [routeData, setRouteData]             = useState<any>(null);
+  const [selectedGrid, setSelectedGrid]       = useState<any>(null);
+  const [selectedGridPos, setSelectedGridPos] = useState<google.maps.LatLngLiteral | null>(null);
+  const [selectedRoute, setSelectedRoute]     = useState(false);
+  const [selectedStart, setSelectedStart]     = useState(false);
+  const [selectedEnd, setSelectedEnd]         = useState(false);
+  const [selectedSegment, setSelectedSegment] = useState<number | null>(null);
+  const [parkingLat, setParkingLat]           = useState('');
+  const [parkingLon, setParkingLon]           = useState('');
+  const [parkingRadius, setParkingRadius]     = useState('2000');
+  const [parkingLimit, setParkingLimit]       = useState('3');
+  const [parkingLoading, setParkingLoading]   = useState(false);
+  const [parkingError, setParkingError]       = useState<string | null>(null);
   const [parkingLocations, setParkingLocations] = useState<ParkingLocation[]>([]);
 
-  // ── Refs ───────────────────────────────────────────────────────────────────
   const mapRef           = useRef<google.maps.Map | null>(null);
   const debounceTimer    = useRef<ReturnType<typeof setTimeout>>();
   const mapDataRef       = useRef<MapData | null>(null);
@@ -117,50 +86,31 @@ export default function WaterloggingMap() {
   const lastBboxKeyRef   = useRef('');
   const idleListenerRef  = useRef<google.maps.MapsEventListener | null>(null);
   const fullGridCacheRef = useRef<any>(null);
+  const routeDataRef     = useRef<any>(null);
 
-  // routeDataRef mirrors routeData state so fetchViewportData (a useCallback)
-  // can read the current route without adding routeData as a dependency —
-  // which would cause the callback to recreate and re-attach listeners on
-  // every single route calculation.
-  const routeDataRef = useRef<any>(null);
-
-  // Keep both data refs in sync with their state counterparts
-  useEffect(() => { mapDataRef.current  = mapData;    }, [mapData]);
+  useEffect(() => { mapDataRef.current  = mapData;   }, [mapData]);
   useEffect(() => { routeDataRef.current = routeData; }, [routeData]);
 
-  // ── Google Maps loader ─────────────────────────────────────────────────────
   const { isLoaded } = useJsApiLoader({
-    id:               'google-map-script',
+    id: 'google-map-script',
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
-    libraries:        GOOGLE_MAPS_LIBRARIES,
-    language:         'en',
-    region:           'IN',
+    libraries: GOOGLE_MAPS_LIBRARIES,
+    language: 'en',
+    region: 'IN',
   });
 
-  // ── Route auto-pan ─────────────────────────────────────────────────────────
-  // Fires whenever a new route is calculated. Grid cells stay fully visible
-  // because fetchViewportData checks routeDataRef and skips viewport clipping
-  // when a route is active (see KEY FIX comment below).
+  // Pan map to fit route when route is calculated
   useEffect(() => {
     if (!routeData || !mapRef.current) return;
-
     const bounds = new google.maps.LatLngBounds();
-
     routeData.route.geometry.coordinates.forEach(
       ([lon, lat]: [number, number]) => bounds.extend({ lat, lng: lon })
     );
     bounds.extend({ lat: routeData.waypoints.start.lat, lng: routeData.waypoints.start.lon });
-    bounds.extend({ lat: routeData.waypoints.end.lat,   lng: routeData.waypoints.end.lon   });
-
-    mapRef.current.fitBounds(bounds, {
-      top:    60,
-      right:  60,
-      bottom: 60,
-      left:   360, // leave room for the 320px control panel
-    });
+    bounds.extend({ lat: routeData.waypoints.end.lat,   lng: routeData.waypoints.end.lon });
+    mapRef.current.fitBounds(bounds, { top: 60, right: 60, bottom: 60, left: 360 });
   }, [routeData]);
 
-  // ── Core data fetch ────────────────────────────────────────────────────────
   const fetchViewportData = useCallback(async (map: google.maps.Map) => {
     clearTimeout(debounceTimer.current);
 
@@ -168,20 +118,8 @@ export default function WaterloggingMap() {
       const zoom   = map.getZoom() ?? 10;
       const bounds = map.getBounds();
 
-      // ── Detail zoom → use cache, no network call ──────────────────────────
       if (fullGridCacheRef.current && zoom >= ZOOM_THRESHOLD && bounds) {
-
-        // KEY FIX: when a route is active, fitBounds zooms in past
-        // ZOOM_THRESHOLD. Without this guard the viewport filter would clip
-        // cells to just the small visible rectangle — hiding all risk cells
-        // outside the current view even though the route passes through them.
-        //
-        // Solution: while a route is displayed, skip viewport clipping
-        // entirely and render ALL cached cells (filtered by risk score only).
-        // This lets the user see flood risk along the full route path even
-        // when zoomed in to a specific segment.
         if (routeDataRef.current) {
-          console.log(`[Cache HIT - route active] zoom=${zoom}, showing all ${fullGridCacheRef.current.features?.length} cached features`);
           const allFeatures = {
             ...fullGridCacheRef.current,
             features: fullGridCacheRef.current.features.filter(
@@ -192,28 +130,18 @@ export default function WaterloggingMap() {
           return;
         }
 
-        // Normal pan/zoom with no route — clip to viewport for performance
-        console.log(`[Cache HIT] zoom=${zoom}, cached features=${fullGridCacheRef.current.features?.length}`);
         const ne = bounds.getNorthEast();
         const sw = bounds.getSouthWest();
-
         const filtered = {
           ...fullGridCacheRef.current,
           features: fullGridCacheRef.current.features.filter((f: any) => {
             let lng: number, lat: number;
             try {
               const coords = f.geometry?.coordinates;
-              if (f.geometry?.type === 'Polygon') {
-                [lng, lat] = coords[0][0];
-              } else if (f.geometry?.type === 'MultiPolygon') {
-                [lng, lat] = coords[0][0][0];
-              } else {
-                return true;
-              }
-            } catch {
-              return true;
-            }
-
+              if (f.geometry?.type === 'Polygon')      [lng, lat] = coords[0][0];
+              else if (f.geometry?.type === 'MultiPolygon') [lng, lat] = coords[0][0][0];
+              else return true;
+            } catch { return true; }
             return (
               lat >= sw.lat() && lat <= ne.lat() &&
               lng >= sw.lng() && lng <= ne.lng() &&
@@ -221,30 +149,24 @@ export default function WaterloggingMap() {
             );
           }),
         };
-
         setMapData(prev => prev ? { ...prev, grid: filtered } : null);
         return;
       }
 
-      // ── City zoom or cold start → fetch from API via worker ───────────────
       if (abortController.current) abortController.current.abort();
       abortController.current = new AbortController();
       const { signal } = abortController.current;
 
       try {
         setLoading(true);
-        console.log(`[Cache MISS] zoom=${zoom}, reason=${fullGridCacheRef.current ? 'zoom changed' : 'cold start'}`);
-
         const gridUrl = `${API_BASE_URL}/api/grid?risk_min=${filterRisk}&zoom=${zoom}`;
         const current = mapDataRef.current;
 
-        // ── Grid fetch + parse via Web Worker ─────────────────────────────
         const gridPromise = new Promise<any>((resolve, reject) => {
           if (gridWorkerRef.current) {
             gridWorkerRef.current.terminate();
             gridWorkerRef.current = null;
           }
-
           const worker = new Worker('/gridWorker.js');
           gridWorkerRef.current = worker;
 
@@ -261,46 +183,46 @@ export default function WaterloggingMap() {
             if (e.data.success) resolve(e.data.data);
             else reject(new Error(e.data.error));
           };
-
           worker.onerror = (e) => {
             clearTimeout(timeout);
             worker.terminate();
             gridWorkerRef.current = null;
             reject(new Error(e.message));
           };
-
           worker.postMessage({ url: gridUrl });
         });
 
-        // ── Wards/drains/stats are small — fine on main thread ─────────────
-        const [wardsRes, drainsRes, statsRes] = await Promise.all([
+        const [wardsRes, drainsRes, statsRes, clustersRes] = await Promise.all([
           current?.wards
             ? Promise.resolve({ json: async () => current.wards })
-            : fetch(`${API_BASE_URL}/api/wards`,  { signal }),
+            :fetch(`${API_BASE_URL}/api/village-boundaries`, { signal }),
           current?.drains
             ? Promise.resolve({ json: async () => current.drains })
-            : fetch(`${API_BASE_URL}/api/drains`, { signal }),
-          fetch(`${API_BASE_URL}/api/stats`, { signal }),
+            : fetch(`${API_BASE_URL}/api/drains`,   { signal }),
+          fetch(`${API_BASE_URL}/api/stats`,         { signal }),
+          current?.clusters
+            ? Promise.resolve({ json: async () => current.clusters })
+            : fetch(`${API_BASE_URL}/api/clusters`,  { signal }),
         ]);
 
-        const [grid, wards, drains, stats] = await Promise.all([
+        const [grid, wards, drains, stats, clusters] = await Promise.all([
           gridPromise,
           wardsRes.json(),
           drainsRes.json(),
           statsRes.json(),
+          clustersRes.json(),
         ]);
 
-        // Cache full grid for client-side filtering on zoom-in
         fullGridCacheRef.current = grid;
 
-        // Merge instead of replace — old grid stays visible until new one ready
         setMapData(prev => ({
-          wards:  prev?.wards  ?? wards,
-          drains: prev?.drains ?? drains,
+          wards:           prev?.wards    ?? wards,
+          drains:          prev?.drains   ?? drains,
+          clusters:        prev?.clusters ?? clusters,
+          isolatedHotspots: prev?.isolatedHotspots ?? null,
           grid,
           stats,
         }));
-
       } catch (err: any) {
         if (err.name !== 'AbortError') {
           console.error('[FloodWatch] fetch error:', err);
@@ -312,25 +234,18 @@ export default function WaterloggingMap() {
     }, 300);
   }, [filterRisk]);
 
-  // When risk filter changes: invalidate cache and re-fetch
   useEffect(() => {
     fullGridCacheRef.current = null;
     lastBboxKeyRef.current   = '';
     if (mapRef.current) fetchViewportData(mapRef.current);
   }, [fetchViewportData]);
 
-  // When route is cleared: restore normal viewport-clipped rendering
   useEffect(() => {
-    if (!routeData && mapRef.current) {
-      fetchViewportData(mapRef.current);
-    }
-  // fetchViewportData intentionally omitted — we only want this on
-  // routeData → null transition, not on every filter change
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!routeData && mapRef.current) fetchViewportData(mapRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeData]);
 
-  // ── deck.gl rendering ──────────────────────────────────────────────────────
-  // setProps updates layer data in-place — no clear/add cycle, no flicker.
+  // deck.gl — rebuild layers whenever grid, wards, or clusters change
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapData?.grid) return;
@@ -339,82 +254,103 @@ export default function WaterloggingMap() {
       deckOverlay.current = new GoogleMapsOverlay({});
       deckOverlay.current.setMap(map);
     }
-
-    deckOverlay.current.setProps({
-      layers: [
+    console.log("Mapdata in the frontend is ",mapData);
+    const layers = [
+      // Village boundaries
+      ...(mapData.wards ? [
         new GeoJsonLayer({
-          id:      'flood-grid',
-          data:    mapData.grid,
-          filled:  true,
-          stroked: false,
-
-          getFillColor: (f: any) => {
-            const score = f.properties?.risk_score ?? 0;
-            if (score > 0.7) return [231, 76,  60,  180];
-            if (score > 0.5) return [230, 126, 34,  180];
-            if (score > 0.3) return [241, 196, 15,  180];
-            return               [46,  204, 113, 160];
-          },
-
-          pickable: true,
-          onClick:  (info: any) => {
+          id:           'village-boundaries',
+          data:         mapData.wards,
+          filled:       false,
+          stroked:      true,
+          getLineColor: [24, 95, 165, 200],
+          getLineWidth: 40,
+          pickable:     true,
+          onClick: (info: any) => {
             if (info.object) {
               setSelectedGrid({ properties: info.object.properties });
-              setSelectedGridPos({
-                lat: info.coordinate[1],
-                lng: info.coordinate[0],
-              });
+              setSelectedGridPos({ lat: info.coordinate[1], lng: info.coordinate[0] });
             }
           },
+          updateTriggers: { getLineColor: mapData.wards },
+        })
+      ] : []),
 
-          updateTriggers: { getFillColor: mapData.grid },
+      // Risk grid cells
+      new GeoJsonLayer({
+        id:      'flood-grid',
+        data:    mapData.grid,
+        filled:  true,
+        stroked: false,
+        getFillColor: (f: any) => {
+          const s = f.properties?.risk_score ?? 0;
+          if (s > 0.7) return [231, 76,  60,  180];
+          if (s > 0.5) return [230, 126, 34,  180];
+          if (s > 0.3) return [241, 196, 15,  180];
+          return              [46,  204, 113, 160];
+        },
+        pickable: true,
+        onClick: (info: any) => {
+          if (info.object) {
+            setSelectedGrid({ properties: info.object.properties });
+            setSelectedGridPos({ lat: info.coordinate[1], lng: info.coordinate[0] });
+          }
+        },
+        updateTriggers: { getFillColor: mapData.grid },
+        transitions: { getFillColor: { duration: 200, easing: (t: number) => t } },
+      }),
 
-          transitions: {
-            getFillColor: { duration: 200, easing: (t: number) => t },
+      // Hotspot clusters
+      ...(mapData.clusters ? [
+        new GeoJsonLayer({
+          id:           'hotspot-clusters',
+          data:         mapData.clusters,
+          filled:       true,
+          stroked:      true,
+          getLineColor: [163, 45, 45, 220],
+          getLineWidth: 60,
+          getFillColor: (f: any) => {
+            const sev = f.properties?.severity;
+            if (sev === 'Critical') return [163, 45,  45,  60];
+            if (sev === 'High')     return [133, 79,  11,  60];
+            return                         [100, 100, 100, 40];
           },
-        }),
-      ],
-    });
-  }, [mapData?.grid]);
+          pickable: true,
+          onClick: (info: any) => {
+            if (info.object) {
+              setSelectedGrid({ properties: info.object.properties });
+              setSelectedGridPos({ lat: info.coordinate[1], lng: info.coordinate[0] });
+            }
+          },
+          updateTriggers: { getFillColor: mapData.clusters },
+        })
+      ] : []),
+    ];
 
-  // ── Shared idle listener factory ───────────────────────────────────────────
-  // Extracted so handleMapLoad and the re-attach effect share identical logic.
+    deckOverlay.current.setProps({ layers });
+  }, [mapData?.grid, mapData?.wards, mapData?.clusters]);
+
   const attachIdleListener = useCallback((map: google.maps.Map) => {
-    if (idleListenerRef.current) {
-      google.maps.event.removeListener(idleListenerRef.current);
-    }
-
+    if (idleListenerRef.current) google.maps.event.removeListener(idleListenerRef.current);
     idleListenerRef.current = map.addListener('idle', () => {
       const zoom = map.getZoom() ?? 10;
-
-      if (zoom >= ZOOM_THRESHOLD) {
-        // fetchViewportData handles the route-active guard internally
-        fetchViewportData(map);
-        return;
-      }
-
-      // City zoom — skip repeat fetches on pan (data is the same)
+      if (zoom >= ZOOM_THRESHOLD) { fetchViewportData(map); return; }
       if (lastBboxKeyRef.current === 'city') return;
       lastBboxKeyRef.current = 'city';
       fetchViewportData(map);
     });
   }, [fetchViewportData]);
 
-  // ── Map onLoad ─────────────────────────────────────────────────────────────
   const handleMapLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
     fetchViewportData(map);
     attachIdleListener(map);
   }, [fetchViewportData, attachIdleListener]);
 
-  // ── Re-attach idle listener when fetchViewportData changes (filter change) ─
-  // Without this the idle listener holds a stale filterRisk closure.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-
     attachIdleListener(map);
-
     return () => {
       if (idleListenerRef.current) {
         google.maps.event.removeListener(idleListenerRef.current);
@@ -423,77 +359,52 @@ export default function WaterloggingMap() {
     };
   }, [attachIdleListener]);
 
-  // ── Cleanup on unmount ─────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
       gridWorkerRef.current?.terminate();
-      if (idleListenerRef.current) {
-        google.maps.event.removeListener(idleListenerRef.current);
-      }
-      if (deckOverlay.current) {
-        deckOverlay.current.setMap(null);
-        deckOverlay.current = null;
-      }
+      if (idleListenerRef.current) google.maps.event.removeListener(idleListenerRef.current);
+      if (deckOverlay.current) { deckOverlay.current.setMap(null); deckOverlay.current = null; }
     };
   }, []);
 
-  // ── Parking helpers ────────────────────────────────────────────────────────
-  const parseNumber = (value: string) => {
-    const num = Number(value);
-    return Number.isFinite(num) ? num : null;
-  };
+  const parseNumber = (v: string) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
 
   const fetchNearbyParking = async (latValue?: number, lonValue?: number) => {
     const latNum = latValue ?? parseNumber(parkingLat);
     const lonNum = lonValue ?? parseNumber(parkingLon);
-    if (latNum === null || lonNum === null) {
-      setParkingError('Enter valid latitude and longitude.');
-      return;
-    }
-    setParkingLoading(true);
-    setParkingError(null);
+    if (latNum === null || lonNum === null) { setParkingError('Enter valid latitude and longitude.'); return; }
+    setParkingLoading(true); setParkingError(null);
     try {
       const data = await safeParkingAPI.getRecommended({
-        lat:    latNum,
-        lon:    lonNum,
+        lat: latNum, lon: lonNum,
         radius: parseNumber(parkingRadius) ?? 2000,
         limit:  parseNumber(parkingLimit)  ?? 3,
       });
       setParkingLocations(data.locations || []);
     } catch (err: any) {
       setParkingError(err?.message || 'Failed to load safe parking.');
-    } finally {
-      setParkingLoading(false);
-    }
+    } finally { setParkingLoading(false); }
   };
 
   const fetchAllParking = async () => {
     const latNum = parseNumber(parkingLat) ?? center.lat;
     const lonNum = parseNumber(parkingLon) ?? center.lng;
-    setParkingLoading(true);
-    setParkingError(null);
+    setParkingLoading(true); setParkingError(null);
     try {
       const data = await safeParkingAPI.getRecommended({
-        lat:    latNum,
-        lon:    lonNum,
+        lat: latNum, lon: lonNum,
         radius: Math.max(parseNumber(parkingRadius) ?? 2000, 10000),
         limit:  Math.max(parseNumber(parkingLimit)  ?? 3,   50),
       });
       setParkingLocations(data.locations || []);
     } catch (err: any) {
       setParkingError(err?.message || 'Failed to load safe parking.');
-    } finally {
-      setParkingLoading(false);
-    }
+    } finally { setParkingLoading(false); }
   };
 
   const useMyLocation = () => {
-    if (!navigator.geolocation) {
-      setParkingError('Geolocation is not supported in this browser.');
-      return;
-    }
-    setParkingLoading(true);
-    setParkingError(null);
+    if (!navigator.geolocation) { setParkingError('Geolocation not supported.'); return; }
+    setParkingLoading(true); setParkingError(null);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const latVal = Number(pos.coords.latitude.toFixed(6));
@@ -502,21 +413,15 @@ export default function WaterloggingMap() {
         setParkingLon(String(lonVal));
         fetchNearbyParking(latVal, lonVal);
       },
-      () => {
-        setParkingLoading(false);
-        setParkingError('Location permission denied.');
-      },
+      () => { setParkingLoading(false); setParkingError('Location permission denied.'); },
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
 
-  // ── Early returns ──────────────────────────────────────────────────────────
   if (!isLoaded) {
     return (
       <div className="flex items-center justify-center h-screen bg-slate-50 dark:bg-slate-950">
-        <div className="text-xl font-semibold text-slate-700 dark:text-slate-200">
-          Loading Google Maps...
-        </div>
+        <div className="text-xl font-semibold text-slate-700 dark:text-slate-200">Loading Google Maps...</div>
       </div>
     );
   }
@@ -532,7 +437,6 @@ export default function WaterloggingMap() {
     );
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="relative h-screen w-full">
 
@@ -550,8 +454,7 @@ export default function WaterloggingMap() {
                         bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-slate-100
                         shadow-lg backdrop-blur">
           <div className="drag-handle px-4 pt-3 pb-2 text-sm font-semibold
-                          cursor-move select-none border-b border-slate-100
-                          dark:border-slate-800">
+                          cursor-move select-none border-b border-slate-100 dark:border-slate-800">
             Map Controls
           </div>
 
@@ -625,20 +528,14 @@ export default function WaterloggingMap() {
               <AccordionContent>
                 <div className="space-y-3">
                   <div className="flex gap-2">
-                    <button
-                      onClick={useMyLocation}
-                      disabled={parkingLoading}
+                    <button onClick={useMyLocation} disabled={parkingLoading}
                       className="flex-1 px-3 py-1.5 rounded bg-blue-600 text-white
-                                 text-xs font-semibold hover:bg-blue-700 disabled:opacity-50"
-                    >
+                                 text-xs font-semibold hover:bg-blue-700 disabled:opacity-50">
                       Use My Location
                     </button>
-                    <button
-                      onClick={fetchAllParking}
-                      disabled={parkingLoading}
+                    <button onClick={fetchAllParking} disabled={parkingLoading}
                       className="flex-1 px-3 py-1.5 rounded bg-emerald-600 text-white
-                                 text-xs font-semibold hover:bg-emerald-700 disabled:opacity-50"
-                    >
+                                 text-xs font-semibold hover:bg-emerald-700 disabled:opacity-50">
                       Show All
                     </button>
                   </div>
@@ -649,42 +546,29 @@ export default function WaterloggingMap() {
                       { placeholder: 'Radius (m)', value: parkingRadius, setter: setParkingRadius },
                       { placeholder: 'Limit',      value: parkingLimit,  setter: setParkingLimit  },
                     ].map(field => (
-                      <input
-                        key={field.placeholder}
-                        type="number"
-                        placeholder={field.placeholder}
-                        value={field.value}
+                      <input key={field.placeholder} type="number"
+                        placeholder={field.placeholder} value={field.value}
                         onChange={e => field.setter(e.target.value)}
                         className="px-2 py-1 border rounded text-xs bg-white dark:bg-slate-900
-                                   border-slate-300 dark:border-slate-700"
-                      />
+                                   border-slate-300 dark:border-slate-700" />
                     ))}
                   </div>
-                  <button
-                    onClick={() => fetchNearbyParking()}
-                    disabled={parkingLoading}
+                  <button onClick={() => fetchNearbyParking()} disabled={parkingLoading}
                     className="w-full px-3 py-1.5 rounded bg-slate-900 text-white text-xs
                                font-semibold hover:bg-slate-800 dark:bg-white dark:text-slate-900
-                               disabled:opacity-50"
-                  >
+                               disabled:opacity-50">
                     {parkingLoading ? 'Searching...' : 'Find Parking'}
                   </button>
-                  {parkingError && (
-                    <div className="text-red-600 text-xs">{parkingError}</div>
-                  )}
+                  {parkingError && <div className="text-red-600 text-xs">{parkingError}</div>}
                   {parkingLocations.length === 0 && !parkingLoading && !parkingError && (
-                    <div className="text-slate-500 text-xs text-center py-2">
-                      No locations found.
-                    </div>
+                    <div className="text-slate-500 text-xs text-center py-2">No locations found.</div>
                   )}
                   {parkingLocations.map(loc => (
-                    <div key={loc.id}
-                         className="p-2 border rounded text-xs bg-slate-50 dark:bg-slate-800">
+                    <div key={loc.id} className="p-2 border rounded text-xs bg-slate-50 dark:bg-slate-800">
                       <div className="font-semibold">{loc.name}</div>
                       <div className="text-slate-600 dark:text-slate-400">{loc.address}</div>
                       <div className="text-slate-500 mt-1">
-                        Ward {loc.ward_number} · {loc.distance_km ?? 'n/a'} km ·
-                        Elev {loc.elevation_m} m
+                        Ward {loc.ward_number} · {loc.distance_km ?? 'n/a'} km · Elev {loc.elevation_m} m
                       </div>
                     </div>
                   ))}
@@ -706,7 +590,6 @@ export default function WaterloggingMap() {
         </div>
       </DraggableContainer>
 
-      {/* Google Map — deck.gl overlay renders grid cells via GPU WebGL */}
       <GoogleMap
         mapContainerStyle={mapContainerStyle}
         center={center}
@@ -718,15 +601,37 @@ export default function WaterloggingMap() {
             position={selectedGridPos}
             onCloseClick={() => { setSelectedGrid(null); setSelectedGridPos(null); }}
           >
-            <div className="text-xs space-y-0.5 min-w-[140px]">
-              <div className="font-semibold mb-1">
-                Cell #{selectedGrid.properties.cell_id || 'N/A'}
-              </div>
-              <div>Risk: <span className="font-medium">{selectedGrid.properties.risk_category || 'Unknown'}</span></div>
-              <div>Score: <span className="font-medium">{selectedGrid.properties.risk_score?.toFixed(3) || 'N/A'}</span></div>
-              <div>Elevation: <span className="font-medium">{selectedGrid.properties.elevation_m?.toFixed(1) || 'N/A'} m</span></div>
-              <div>Rainfall: <span className="font-medium">{selectedGrid.properties.rainfall_24h_mm?.toFixed(1) || 'N/A'} mm</span></div>
-              <div>Drain dist: <span className="font-medium">{selectedGrid.properties.drain_distance_m?.toFixed(0) || 'N/A'} m</span></div>
+            <div className="text-xs space-y-0.5 min-w-[160px]">
+              {/* Village boundary click */}
+              {selectedGrid.properties.VILLAGE && !selectedGrid.properties.cell_id && (
+                <>
+                  <div className="font-semibold mb-1">{selectedGrid.properties.VILLAGE}</div>
+                  <div>Tehsil: <span className="font-medium">{selectedGrid.properties.TEHSIL || '—'}</span></div>
+                  <div>District: <span className="font-medium">{selectedGrid.properties.DISTRICT || '—'}</span></div>
+                </>
+              )}
+              {/* Cluster click */}
+              {selectedGrid.properties.severity && (
+                <>
+                  <div className="font-semibold mb-1">Cluster #{selectedGrid.properties.cluster_id}</div>
+                  <div>Severity: <span className="font-medium">{selectedGrid.properties.severity}</span></div>
+                  <div>Avg risk: <span className="font-medium">{selectedGrid.properties.avg_risk?.toFixed(3)}</span></div>
+                  <div>Cells: <span className="font-medium">{selectedGrid.properties.cell_count}</span></div>
+                  <div>Villages: <span className="font-medium">{selectedGrid.properties.villages || '—'}</span></div>
+                </>
+              )}
+              {/* Grid cell click */}
+              {selectedGrid.properties.cell_id && (
+                <>
+                  <div className="font-semibold mb-1">Cell #{selectedGrid.properties.cell_id}</div>
+                  <div>Risk: <span className="font-medium">{selectedGrid.properties.risk_category || 'Unknown'}</span></div>
+                  <div>Score: <span className="font-medium">{selectedGrid.properties.risk_score?.toFixed(3) || 'N/A'}</span></div>
+                  <div>Village: <span className="font-medium">{selectedGrid.properties.village || '—'}</span></div>
+                  <div>Elevation: <span className="font-medium">{selectedGrid.properties.elevation_m?.toFixed(1) || 'N/A'} m</span></div>
+                  <div>Rainfall: <span className="font-medium">{selectedGrid.properties.rainfall_24h_mm?.toFixed(1) || 'N/A'} mm</span></div>
+                  <div>Drain dist: <span className="font-medium">{selectedGrid.properties.drain_distance_m?.toFixed(0) || 'N/A'} m</span></div>
+                </>
+              )}
             </div>
           </InfoWindow>
         )}
@@ -737,20 +642,13 @@ export default function WaterloggingMap() {
               path={routeData.route.geometry.coordinates.map(
                 ([lon, lat]: [number, number]) => ({ lat, lng: lon })
               )}
-              options={{
-                strokeColor:   routeData.risk_analysis.color,
-                strokeWeight:  6,
-                strokeOpacity: 0.85,
-              }}
+              options={{ strokeColor: routeData.risk_analysis.color, strokeWeight: 6, strokeOpacity: 0.85 }}
               onClick={() => setSelectedRoute(true)}
             />
 
             {selectedRoute && (
               <InfoWindow
-                position={{
-                  lat: routeData.route.geometry.coordinates[0][1],
-                  lng: routeData.route.geometry.coordinates[0][0],
-                }}
+                position={{ lat: routeData.route.geometry.coordinates[0][1], lng: routeData.route.geometry.coordinates[0][0] }}
                 onCloseClick={() => setSelectedRoute(false)}
               >
                 <div className="text-xs space-y-0.5 min-w-[140px]">
@@ -795,19 +693,12 @@ export default function WaterloggingMap() {
                 key={idx}
                 center={{ lat: segment.lat, lng: segment.lon }}
                 radius={100}
-                options={{
-                  strokeColor:   '#e74c3c',
-                  strokeOpacity: 0.8,
-                  strokeWeight:  2,
-                  fillColor:     '#e74c3c',
-                  fillOpacity:   0.3,
-                }}
+                options={{ strokeColor: '#e74c3c', strokeOpacity: 0.8, strokeWeight: 2, fillColor: '#e74c3c', fillOpacity: 0.3 }}
                 onClick={() => setSelectedSegment(idx === selectedSegment ? null : idx)}
               />
             ))}
 
-            {selectedSegment !== null &&
-              routeData.risk_analysis.high_risk_segments[selectedSegment] && (
+            {selectedSegment !== null && routeData.risk_analysis.high_risk_segments[selectedSegment] && (
               <InfoWindow
                 position={{
                   lat: routeData.risk_analysis.high_risk_segments[selectedSegment].lat,
@@ -827,25 +718,17 @@ export default function WaterloggingMap() {
 
         {mapData?.drains?.features?.map((feature: any, idx: number) => {
           if (feature.geometry.type !== 'LineString') return null;
-          const path = feature.geometry.coordinates.map(
-            ([lng, lat]: [number, number]) => ({ lat, lng })
-          );
+          const path = feature.geometry.coordinates.map(([lng, lat]: [number, number]) => ({ lat, lng }));
           return (
-            <Polyline
-              key={`drain-${idx}`}
-              path={path}
-              options={{ strokeColor: '#3b82f6', strokeWeight: 1.5, strokeOpacity: 0.5 }}
-            />
+            <Polyline key={`drain-${idx}`} path={path}
+              options={{ strokeColor: '#3b82f6', strokeWeight: 1.5, strokeOpacity: 0.5 }} />
           );
         })}
 
         {parkingLocations.map(loc => (
-          <Marker
-            key={loc.id}
-            position={{ lat: loc.lat, lng: loc.lon }}
+          <Marker key={loc.id} position={{ lat: loc.lat, lng: loc.lon }}
             icon={{ url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png' }}
-            title={loc.name}
-          />
+            title={loc.name} />
         ))}
 
       </GoogleMap>
@@ -853,18 +736,8 @@ export default function WaterloggingMap() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DraggableContainer
-// ─────────────────────────────────────────────────────────────────────────────
-
-function DraggableContainer({
-  children,
-  defaultX,
-  defaultY,
-}: {
-  children: React.ReactNode;
-  defaultX: number;
-  defaultY: number;
+function DraggableContainer({ children, defaultX, defaultY }: {
+  children: React.ReactNode; defaultX: number; defaultY: number;
 }) {
   const [position, setPosition] = useState({ x: defaultX, y: defaultY });
   const [dragging, setDragging] = useState(false);
@@ -896,25 +769,14 @@ function DraggableContainer({
   };
 
   return (
-    <div
-      ref={ref}
-      className="absolute z-[1000]"
-      style={{ left: position.x, top: position.y }}
-      onMouseDown={onMouseDown}
-    >
+    <div ref={ref} className="absolute z-[1000]"
+      style={{ left: position.x, top: position.y }} onMouseDown={onMouseDown}>
       {children}
     </div>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// RoutePanelContent
-// ─────────────────────────────────────────────────────────────────────────────
-
-function RoutePanelContent({
-  onRouteCalculated,
-  onClearRoute,
-}: {
+function RoutePanelContent({ onRouteCalculated, onClearRoute }: {
   onRouteCalculated: (data: any) => void;
   onClearRoute: () => void;
 }) {
@@ -934,18 +796,15 @@ function RoutePanelContent({
   };
 
   const handleCalculateRoute = async () => {
-    setLoading(true);
-    setError(null);
+    setLoading(true); setError(null);
     try {
       const [startLoc, endLoc] = await Promise.all([
-        resolveLocation(startQuery),
-        resolveLocation(endQuery),
+        resolveLocation(startQuery), resolveLocation(endQuery),
       ]);
       const res = await fetch(
         `${API_BASE_URL}/api/route?` +
         `start_lat=${startLoc.lat}&start_lon=${startLoc.lon}&` +
-        `end_lat=${endLoc.lat}&end_lon=${endLoc.lon}&` +
-        `profile=${profile}`
+        `end_lat=${endLoc.lat}&end_lon=${endLoc.lon}&profile=${profile}`
       );
       if (!res.ok) throw new Error('Failed to calculate route');
       const data = await res.json();
@@ -953,16 +812,10 @@ function RoutePanelContent({
       onRouteCalculated(data);
     } catch (err: any) {
       setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
-  const handleClear = () => {
-    setRouteInfo(null);
-    onClearRoute();
-  };
-
+  const handleClear = () => { setRouteInfo(null); onClearRoute(); };
   const presets = ['Preet Vihar', 'Mayur Vihar', 'Laxmi Nagar', 'Gandhi Nagar'];
 
   return (
@@ -971,13 +824,9 @@ function RoutePanelContent({
         <div className="text-xs text-slate-500 mb-1.5">Quick locations</div>
         <div className="flex flex-wrap gap-1.5">
           {presets.map(name => (
-            <button
-              key={name}
-              onClick={() => setStartQuery(name)}
+            <button key={name} onClick={() => setStartQuery(name)}
               className="text-xs px-2 py-1 rounded bg-blue-50 dark:bg-blue-950/40
-                         text-blue-700 dark:text-blue-300 hover:bg-blue-100
-                         dark:hover:bg-blue-900/50 transition-colors"
-            >
+                         text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition-colors">
               {name}
             </button>
           ))}
@@ -986,54 +835,38 @@ function RoutePanelContent({
 
       <div>
         <label className="block text-xs font-medium mb-1 text-slate-600 dark:text-slate-400">Start</label>
-        <input
-          type="text"
-          value={startQuery}
-          onChange={e => setStartQuery(e.target.value)}
+        <input type="text" value={startQuery} onChange={e => setStartQuery(e.target.value)}
           placeholder="e.g. Connaught Place"
           className="w-full px-2 py-1.5 border rounded text-sm bg-white dark:bg-slate-900
-                     border-slate-300 dark:border-slate-700"
-        />
+                     border-slate-300 dark:border-slate-700" />
       </div>
 
       <div>
         <label className="block text-xs font-medium mb-1 text-slate-600 dark:text-slate-400">Destination</label>
-        <input
-          type="text"
-          value={endQuery}
-          onChange={e => setEndQuery(e.target.value)}
+        <input type="text" value={endQuery} onChange={e => setEndQuery(e.target.value)}
           placeholder="e.g. India Gate"
           className="w-full px-2 py-1.5 border rounded text-sm bg-white dark:bg-slate-900
-                     border-slate-300 dark:border-slate-700"
-        />
+                     border-slate-300 dark:border-slate-700" />
       </div>
 
-      <select
-        value={profile}
-        onChange={e => setProfile(e.target.value)}
+      <select value={profile} onChange={e => setProfile(e.target.value)}
         className="w-full px-2 py-1.5 border rounded text-sm bg-white dark:bg-slate-900
-                   border-slate-300 dark:border-slate-700"
-      >
+                   border-slate-300 dark:border-slate-700">
         <option value="driving">Driving</option>
         <option value="walking">Walking</option>
         <option value="cycling">Cycling</option>
       </select>
 
       <div className="flex gap-2">
-        <button
-          onClick={handleCalculateRoute}
-          disabled={loading}
+        <button onClick={handleCalculateRoute} disabled={loading}
           className="flex-1 bg-blue-500 text-white py-1.5 rounded text-sm font-medium
-                     hover:bg-blue-600 disabled:opacity-50 transition-colors"
-        >
+                     hover:bg-blue-600 disabled:opacity-50 transition-colors">
           {loading ? 'Calculating...' : 'Find Route'}
         </button>
         {routeInfo && (
-          <button
-            onClick={handleClear}
+          <button onClick={handleClear}
             className="bg-red-500 text-white px-3 py-1.5 rounded text-sm font-medium
-                       hover:bg-red-600 transition-colors"
-          >
+                       hover:bg-red-600 transition-colors">
             Clear
           </button>
         )}
@@ -1059,17 +892,14 @@ function RoutePanelContent({
           </div>
           <div className="flex justify-between items-center">
             <span className="text-slate-500">Risk</span>
-            <span
-              className="font-medium px-2 py-0.5 rounded text-white text-xs"
-              style={{ backgroundColor: routeInfo.risk_analysis.color }}
-            >
+            <span className="font-medium px-2 py-0.5 rounded text-white text-xs"
+              style={{ backgroundColor: routeInfo.risk_analysis.color }}>
               {routeInfo.risk_analysis.risk_level}
             </span>
           </div>
           {routeInfo.risk_analysis.warning_count > 0 && (
-            <div className="text-amber-700 dark:text-amber-300 bg-amber-50
-                            dark:bg-amber-950/30 border border-amber-200
-                            dark:border-amber-900 rounded px-2 py-1.5 mt-1">
+            <div className="text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30
+                            border border-amber-200 dark:border-amber-900 rounded px-2 py-1.5 mt-1">
               {routeInfo.risk_analysis.warning_count} high-risk segment
               {routeInfo.risk_analysis.warning_count > 1 ? 's' : ''} on this route
             </div>
