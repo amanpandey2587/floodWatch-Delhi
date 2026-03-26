@@ -20,11 +20,10 @@ import { GoogleMapsOverlay } from "@deck.gl/google-maps";
 import { GeoJsonLayer } from "@deck.gl/layers";
 import { MVTLayer } from "@deck.gl/geo-layers";
 import { GOOGLE_MAPS_CONFIG } from "@/lib/googleMap";
+import { useRoutePrefill } from "@/hooks/useAssistantPrefill";
+import { Wand2 } from "lucide-react";
 
-// const GOOGLE_MAPS_LIBRARIES: ("places" | "visualization")[] = [
-//   "places",
-//   "visualization",
-// ];
+// ─── Constants & Options ──────────────────────────────────────────────────────
 const mapContainerStyle = { width: "100%", height: "100%" };
 const center = { lat: 28.67, lng: 77.3 };
 
@@ -48,10 +47,7 @@ const mapOptions: google.maps.MapOptions = {
   ],
 };
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface MapData {
   wards: any;
   drains: any;
@@ -76,10 +72,6 @@ interface ParkingLocation {
 
 // ---------------------------------------------------------------------------
 // getRiskFillColor
-//
-// Pure function — no closure over component state.
-// Returns transparent [0,0,0,0] for cells below filterRisk threshold so that
-// filtered cells disappear without touching the tile cache.
 // ---------------------------------------------------------------------------
 function getRiskFillColor(
   f: any,
@@ -93,10 +85,7 @@ function getRiskFillColor(
   return [46, 204, 113, 160]; // green   — low
 }
 
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
-
+// ─── Main component ───────────────────────────────────────────────────────────
 export default function WaterloggingMap() {
   const safeParkingAPI = useSafeParkingAPI();
 
@@ -105,66 +94,47 @@ export default function WaterloggingMap() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterRisk, setFilterRisk] = useState(0);
+
+  // Route
   const [routeData, setRouteData] = useState<any>(null);
-  const [selectedGrid, setSelectedGrid] = useState<any>(null);
-  const [selectedGridPos, setSelectedGridPos] =
-    useState<google.maps.LatLngLiteral | null>(null);
   const [selectedRoute, setSelectedRoute] = useState(false);
   const [selectedStart, setSelectedStart] = useState(false);
   const [selectedEnd, setSelectedEnd] = useState(false);
   const [selectedSegment, setSelectedSegment] = useState<number | null>(null);
+  const [selectedGrid, setSelectedGrid] = useState<any>(null);
+  const [selectedGridPos, setSelectedGridPos] = useState<google.maps.LatLngLiteral | null>(null);
+
+  // Parking
   const [parkingLat, setParkingLat] = useState("");
   const [parkingLon, setParkingLon] = useState("");
   const [parkingRadius, setParkingRadius] = useState("2000");
   const [parkingLimit, setParkingLimit] = useState("3");
   const [parkingLoading, setParkingLoading] = useState(false);
   const [parkingError, setParkingError] = useState<string | null>(null);
-  const [parkingLocations, setParkingLocations] = useState<ParkingLocation[]>(
-    [],
-  );
+  const [parkingLocations, setParkingLocations] = useState<ParkingLocation[]>([]);
 
   // ── Stable refs ────────────────────────────────────────────────────────────
   const mapRef = useRef<google.maps.Map | null>(null);
-  // TWO separate overlays — the key fix for pan blank flash:
-  // gridOverlay   → MVTLayer ONLY. setProps is NEVER called on pan/zoom.
-  //                 Tile cache lives here and stays resident in GPU memory.
-  // staticOverlay → wards + clusters. Updated when data loads, never on pan.
   const gridOverlay = useRef<GoogleMapsOverlay | null>(null);
   const staticOverlay = useRef<GoogleMapsOverlay | null>(null);
   const abortController = useRef<AbortController | null>(null);
 
-  // Static data — stored in refs so updates don't cause re-renders
   const wardsRef = useRef<any>(null);
   const drainsRef = useRef<any>(null);
   const clustersRef = useRef<any>(null);
-
-  // MVTLayer ref — THE KEY FIX:
-  // We keep a single MVTLayer instance alive and clone() it for prop updates.
-  // Cloning preserves the internal tile cache so panning never shows blank tiles.
-  // Creating a new instance (even with the same id) wipes the cache every time.
   const mvtLayerRef = useRef<any>(null);
 
-  // filterRisk in a ref so pushLayersToDeck (zero-dep) always reads latest value
   const filterRiskRef = useRef(filterRisk);
   useEffect(() => {
     filterRiskRef.current = filterRisk;
   }, [filterRisk]);
 
-  // Stable click handler — same function object on every call so deck.gl
-  // never sees onClick as a changed prop and skips unnecessary re-processing.
   const onClickInfoRef = useRef((props: any, coord: [number, number]) => {
     setSelectedGrid({ properties: props });
     setSelectedGridPos({ lat: coord[1], lng: coord[0] });
   });
 
   // ── Google Maps JS API ─────────────────────────────────────────────────────
-  // const { isLoaded } = useJsApiLoader({
-  //   id: "google-map-script",
-  //   googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
-  //   libraries: GOOGLE_MAPS_LIBRARIES,
-  //   language: "en",
-  //   region: "IN",
-  // });
   const { isLoaded } = useJsApiLoader(GOOGLE_MAPS_CONFIG);
 
   // ── Pan map to fit route whenever routeData changes ────────────────────────
@@ -191,21 +161,6 @@ export default function WaterloggingMap() {
   }, [routeData]);
 
   // ── pushLayersToDeck ───────────────────────────────────────────────────────
-  //
-  // Zero dependencies — everything is read via refs.
-  //
-  // MVTLayer lifecycle:
-  //   First call  → new MVTLayer(...)     — creates tile cache from scratch
-  //   Later calls → mvtLayerRef.clone()   — preserves tile cache, updates colours only
-  //
-  // GeoJsonLayer for wards/clusters is fine to recreate — they are small static
-  // datasets that deck.gl uploads to GPU once and reuses.
-  // ---------------------------------------------------------------------------
-  // pushLayersToDeck — zero deps, reads everything via refs.
-  //
-  // Grid overlay is NEVER touched after init — only staticOverlay gets setProps.
-  // For filterRisk changes we clone() the MVTLayer and call setProps on gridOverlay only.
-  // Pan/zoom never calls this function at all — MVTLayer handles that internally.
   const pushLayersToDeck = useCallback((onlyStatic = false) => {
     // ── Static overlay: wards + clusters ──────────────────────────────────────
     if (staticOverlay.current) {
@@ -218,12 +173,7 @@ export default function WaterloggingMap() {
                   data: wardsRef.current,
                   filled: false,
                   stroked: true,
-                  getLineColor: [24, 95, 165, 200] as [
-                    number,
-                    number,
-                    number,
-                    number,
-                  ],
+                  getLineColor: [24, 95, 165, 200] as [number, number, number, number],
                   getLineWidth: 40,
                   pickable: true,
                   onClick: (info: any) => {
@@ -243,35 +193,13 @@ export default function WaterloggingMap() {
                   data: clustersRef.current,
                   filled: true,
                   stroked: true,
-                  getLineColor: [163, 45, 45, 220] as [
-                    number,
-                    number,
-                    number,
-                    number,
-                  ],
+                  getLineColor: [163, 45, 45, 220] as [number, number, number, number],
                   getLineWidth: 60,
                   getFillColor: (f: any) => {
                     const sev = f.properties?.severity;
-                    if (sev === "Critical")
-                      return [163, 45, 45, 60] as [
-                        number,
-                        number,
-                        number,
-                        number,
-                      ];
-                    if (sev === "High")
-                      return [133, 79, 11, 60] as [
-                        number,
-                        number,
-                        number,
-                        number,
-                      ];
-                    return [100, 100, 100, 40] as [
-                      number,
-                      number,
-                      number,
-                      number,
-                    ];
+                    if (sev === "Critical") return [163, 45, 45, 60] as [number, number, number, number];
+                    if (sev === "High") return [133, 79, 11, 60] as [number, number, number, number];
+                    return [100, 100, 100, 40] as [number, number, number, number];
                   },
                   pickable: true,
                   onClick: (info: any) => {
@@ -286,7 +214,6 @@ export default function WaterloggingMap() {
             : []),
         ],
       });
-      console.log("[FloodWatch] Static overlay updated");
     }
 
     if (onlyStatic) return;
@@ -298,14 +225,10 @@ export default function WaterloggingMap() {
         updateTriggers: { getFillColor: [filterRiskRef.current] },
       });
       gridOverlay.current.setProps({ layers: [mvtLayerRef.current] });
-      console.log(
-        "[FloodWatch] Grid overlay colour updated, filterRisk =",
-        filterRiskRef.current,
-      );
     }
-  }, []); // zero deps — everything read via refs
+  }, []);
 
-  // ── fetchStaticData — called once on map load ──────────────────────────────
+  // ── fetchStaticData ────────────────────────────────────────────────────────
   const fetchStaticData = useCallback(async () => {
     if (abortController.current) abortController.current.abort();
     abortController.current = new AbortController();
@@ -315,16 +238,10 @@ export default function WaterloggingMap() {
       setLoading(true);
 
       const [wardsRes, drainsRes, statsRes, clustersRes] = await Promise.all([
-        wardsRef.current
-          ? Promise.resolve({ json: async () => wardsRef.current })
-          : fetch(`${API_BASE_URL}/api/village-boundaries`, { signal }),
-        drainsRef.current
-          ? Promise.resolve({ json: async () => drainsRef.current })
-          : fetch(`${API_BASE_URL}/api/drains`, { signal }),
+        wardsRef.current ? Promise.resolve({ json: async () => wardsRef.current }) : fetch(`${API_BASE_URL}/api/village-boundaries`, { signal }),
+        drainsRef.current ? Promise.resolve({ json: async () => drainsRef.current }) : fetch(`${API_BASE_URL}/api/drains`, { signal }),
         fetch(`${API_BASE_URL}/api/stats`, { signal }),
-        clustersRef.current
-          ? Promise.resolve({ json: async () => clustersRef.current })
-          : fetch(`${API_BASE_URL}/api/clusters`, { signal }),
+        clustersRef.current ? Promise.resolve({ json: async () => clustersRef.current }) : fetch(`${API_BASE_URL}/api/clusters`, { signal }),
       ]);
 
       const [wards, drains, stats, clusters] = await Promise.all([
@@ -334,25 +251,11 @@ export default function WaterloggingMap() {
         clustersRes.json(),
       ]);
 
-      console.log(
-        "[FloodWatch] Raw stats response:",
-        JSON.stringify(stats, null, 2),
-      );
-
       wardsRef.current = wards;
       drainsRef.current = drains;
       clustersRef.current = clusters;
 
-      console.log(
-        "[FloodWatch] Static data loaded — wards:",
-        wards?.features?.length,
-        "clusters:",
-        clusters?.features?.length,
-      );
-
-      // Only update static overlay — grid overlay tile cache is untouched
       pushLayersToDeck(true);
-
       setMapData({ wards, drains, stats, clusters, isolatedHotspots: null });
     } catch (err: any) {
       if (err.name !== "AbortError") {
@@ -364,13 +267,11 @@ export default function WaterloggingMap() {
     }
   }, [pushLayersToDeck]);
 
-  // ── handleMapLoad — both overlays created once, never recreated ───────────
+  // ── handleMapLoad ──────────────────────────────────────────────────────────
   const handleMapLoad = useCallback(
     (map: google.maps.Map) => {
       mapRef.current = map;
 
-      // Grid overlay — interleaved renders at WebGL level, eliminates canvas
-      // repositioning flash that overlay mode has on every pan frame.
       if (!gridOverlay.current) {
         mvtLayerRef.current = new MVTLayer({
           id: "flood-grid",
@@ -395,19 +296,14 @@ export default function WaterloggingMap() {
           layers: [mvtLayerRef.current],
         });
         gridOverlay.current.setMap(map);
-        console.log(
-          "[FloodWatch] Grid overlay created (interleaved, tile cache initialized)",
-        );
       }
 
-      // Static overlay — starts empty, populated after fetchStaticData resolves
       if (!staticOverlay.current) {
         staticOverlay.current = new GoogleMapsOverlay({
           interleaved: true,
           layers: [],
         });
         staticOverlay.current.setMap(map);
-        console.log("[FloodWatch] Static overlay created");
       }
 
       fetchStaticData();
@@ -415,25 +311,14 @@ export default function WaterloggingMap() {
     [fetchStaticData],
   );
 
-  // ── Re-push on filterRisk change ───────────────────────────────────────────
-  // Uses clone() internally — only colour buffer is rewritten, tile cache untouched
   useEffect(() => {
-    console.log(
-      "[FloodWatch] filterRisk changed to",
-      filterRisk,
-      "— cloning MVTLayer",
-    );
     pushLayersToDeck();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterRisk]);
+  }, [filterRisk, pushLayersToDeck]);
 
-  // ── Re-push when route is cleared ─────────────────────────────────────────
   useEffect(() => {
     if (!routeData) pushLayersToDeck();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeData]);
+  }, [routeData, pushLayersToDeck]);
 
-  // ── Cleanup on unmount ─────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
       abortController.current?.abort();
@@ -548,26 +433,15 @@ export default function WaterloggingMap() {
   return (
     <div className="relative h-screen w-full">
       {loading && (
-        <div
-          className="absolute top-4 right-4 z-[1001] bg-white/90 dark:bg-slate-900/90
-                        px-3 py-1.5 rounded-full text-xs font-medium text-slate-600
-                        dark:text-slate-300 border border-slate-200 dark:border-slate-700"
-        >
+        <div className="absolute top-4 right-4 z-[1001] bg-white/90 dark:bg-slate-900/90 px-3 py-1.5 rounded-full text-xs font-medium text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
           Updating...
         </div>
       )}
 
+      {/* ── Draggable side panel ────────────────────────────────────────────── */}
       <DraggableContainer defaultX={16} defaultY={16}>
-        <div
-          className="w-[320px] max-h-[calc(100vh-32px)] overflow-y-auto rounded-lg
-                        border border-slate-200 dark:border-slate-800
-                        bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-slate-100
-                        shadow-lg backdrop-blur"
-        >
-          <div
-            className="drag-handle px-4 pt-3 pb-2 text-sm font-semibold
-                          cursor-move select-none border-b border-slate-100 dark:border-slate-800"
-          >
+        <div className="w-[320px] max-h-[calc(100vh-32px)] overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-slate-100 shadow-lg backdrop-blur">
+          <div className="drag-handle px-4 pt-3 pb-2 text-sm font-semibold cursor-move select-none border-b border-slate-100 dark:border-slate-800">
             Map Controls
           </div>
 
@@ -633,15 +507,15 @@ export default function WaterloggingMap() {
               <AccordionContent>
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { label: "All", value: 0, active: "bg-blue-500" },
-                    { label: "Medium+", value: 0.3, active: "bg-yellow-500" },
-                    { label: "High+", value: 0.5, active: "bg-orange-500" },
-                    { label: "Critical", value: 0.7, active: "bg-red-500" },
+                    { label: "All", value: 0, active: "bg-blue-500 text-white" },
+                    { label: "Medium+", value: 0.3, active: "bg-yellow-500 text-white" },
+                    { label: "High+", value: 0.5, active: "bg-orange-500 text-white" },
+                    { label: "Critical", value: 0.7, active: "bg-red-500 text-white" },
                   ].map((btn) => (
                     <button
                       key={btn.value}
                       onClick={() => setFilterRisk(btn.value)}
-                      className={`px-3 py-2 rounded text-xs font-semibold text-white transition-colors
+                      className={`px-3 py-2 rounded text-xs font-semibold transition-colors
                         ${
                           filterRisk === btn.value
                             ? btn.active
@@ -663,42 +537,24 @@ export default function WaterloggingMap() {
                     <button
                       onClick={useMyLocation}
                       disabled={parkingLoading}
-                      className="flex-1 px-3 py-1.5 rounded bg-blue-600 text-white
-                                 text-xs font-semibold hover:bg-blue-700 disabled:opacity-50"
+                      className="flex-1 px-3 py-1.5 rounded bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-50"
                     >
                       Use My Location
                     </button>
                     <button
                       onClick={fetchAllParking}
                       disabled={parkingLoading}
-                      className="flex-1 px-3 py-1.5 rounded bg-emerald-600 text-white
-                                 text-xs font-semibold hover:bg-emerald-700 disabled:opacity-50"
+                      className="flex-1 px-3 py-1.5 rounded bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 disabled:opacity-50"
                     >
                       Show All
                     </button>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     {[
-                      {
-                        placeholder: "Latitude",
-                        value: parkingLat,
-                        setter: setParkingLat,
-                      },
-                      {
-                        placeholder: "Longitude",
-                        value: parkingLon,
-                        setter: setParkingLon,
-                      },
-                      {
-                        placeholder: "Radius (m)",
-                        value: parkingRadius,
-                        setter: setParkingRadius,
-                      },
-                      {
-                        placeholder: "Limit",
-                        value: parkingLimit,
-                        setter: setParkingLimit,
-                      },
+                      { placeholder: "Latitude", value: parkingLat, setter: setParkingLat },
+                      { placeholder: "Longitude", value: parkingLon, setter: setParkingLon },
+                      { placeholder: "Radius (m)", value: parkingRadius, setter: setParkingRadius },
+                      { placeholder: "Limit", value: parkingLimit, setter: setParkingLimit },
                     ].map((field) => (
                       <input
                         key={field.placeholder}
@@ -706,34 +562,29 @@ export default function WaterloggingMap() {
                         placeholder={field.placeholder}
                         value={field.value}
                         onChange={(e) => field.setter(e.target.value)}
-                        className="px-2 py-1 border rounded text-xs bg-white dark:bg-slate-900
-                                   border-slate-300 dark:border-slate-700"
+                        className="px-2 py-1 border rounded text-xs bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
                       />
                     ))}
                   </div>
                   <button
                     onClick={() => fetchNearbyParking()}
                     disabled={parkingLoading}
-                    className="w-full px-3 py-1.5 rounded bg-slate-900 text-white text-xs
-                               font-semibold hover:bg-slate-800 dark:bg-white dark:text-slate-900
-                               disabled:opacity-50"
+                    className="w-full px-3 py-1.5 rounded bg-slate-900 text-white text-xs font-semibold hover:opacity-90 dark:bg-white dark:text-slate-900 disabled:opacity-50"
                   >
                     {parkingLoading ? "Searching..." : "Find Parking"}
                   </button>
                   {parkingError && (
                     <div className="text-red-600 text-xs">{parkingError}</div>
                   )}
-                  {parkingLocations.length === 0 &&
-                    !parkingLoading &&
-                    !parkingError && (
-                      <div className="text-slate-500 text-xs text-center py-2">
-                        No locations found.
-                      </div>
-                    )}
+                  {parkingLocations.length === 0 && !parkingLoading && !parkingError && (
+                    <div className="text-slate-500 text-xs text-center py-2">
+                      No locations found.
+                    </div>
+                  )}
                   {parkingLocations.map((loc) => (
                     <div
                       key={loc.id}
-                      className="p-2 border rounded text-xs bg-slate-50 dark:bg-slate-800"
+                      className="p-2 border rounded text-xs bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
                     >
                       <div className="font-semibold">{loc.name}</div>
                       <div className="text-slate-600 dark:text-slate-400">
@@ -789,9 +640,7 @@ export default function WaterloggingMap() {
               {selectedGrid.properties.VILLAGE &&
                 !selectedGrid.properties.cell_id && (
                   <>
-                    <div
-                      style={{ fontWeight: 700, marginBottom: 4, fontSize: 13 }}
-                    >
+                    <div style={{ fontWeight: 700, marginBottom: 4, fontSize: 13 }}>
                       {selectedGrid.properties.VILLAGE}
                     </div>
                     <div style={{ color: "#475569" }}>
@@ -810,9 +659,7 @@ export default function WaterloggingMap() {
                 )}
               {selectedGrid.properties.severity && (
                 <>
-                  <div
-                    style={{ fontWeight: 700, marginBottom: 4, fontSize: 13 }}
-                  >
+                  <div style={{ fontWeight: 700, marginBottom: 4, fontSize: 13 }}>
                     Cluster #{selectedGrid.properties.cluster_id}
                   </div>
                   <div style={{ color: "#475569" }}>
@@ -843,9 +690,7 @@ export default function WaterloggingMap() {
               )}
               {selectedGrid.properties.cell_id && (
                 <>
-                  <div
-                    style={{ fontWeight: 700, marginBottom: 4, fontSize: 13 }}
-                  >
+                  <div style={{ fontWeight: 700, marginBottom: 4, fontSize: 13 }}>
                     Cell #{selectedGrid.properties.cell_id}
                   </div>
                   <div style={{ color: "#475569" }}>
@@ -885,24 +730,19 @@ export default function WaterloggingMap() {
                   <div style={{ color: "#475569" }}>
                     Elevation:{" "}
                     <span style={{ fontWeight: 600, color: "#1e293b" }}>
-                      {selectedGrid.properties.elevation_m?.toFixed(1) || "N/A"}{" "}
-                      m
+                      {selectedGrid.properties.elevation_m?.toFixed(1) || "N/A"} m
                     </span>
                   </div>
                   <div style={{ color: "#475569" }}>
                     Rainfall:{" "}
                     <span style={{ fontWeight: 600, color: "#1e293b" }}>
-                      {selectedGrid.properties.rainfall_24h_mm?.toFixed(1) ||
-                        "N/A"}{" "}
-                      mm
+                      {selectedGrid.properties.rainfall_24h_mm?.toFixed(1) || "N/A"} mm
                     </span>
                   </div>
                   <div style={{ color: "#475569" }}>
                     Drain dist:{" "}
                     <span style={{ fontWeight: 600, color: "#1e293b" }}>
-                      {selectedGrid.properties.drain_distance_m?.toFixed(0) ||
-                        "N/A"}{" "}
-                      m
+                      {selectedGrid.properties.drain_distance_m?.toFixed(0) || "N/A"} m
                     </span>
                   </div>
                 </>
@@ -925,7 +765,6 @@ export default function WaterloggingMap() {
               }}
               onClick={() => setSelectedRoute(true)}
             />
-
             {selectedRoute && (
               <InfoWindow
                 position={{
@@ -943,9 +782,7 @@ export default function WaterloggingMap() {
                     lineHeight: 1.6,
                   }}
                 >
-                  <div
-                    style={{ fontWeight: 700, marginBottom: 4, fontSize: 13 }}
-                  >
+                  <div style={{ fontWeight: 700, marginBottom: 4, fontSize: 13 }}>
                     Route Details
                   </div>
                   <div style={{ color: "#475569" }}>
@@ -996,14 +833,7 @@ export default function WaterloggingMap() {
                 }}
                 onCloseClick={() => setSelectedStart(false)}
               >
-                <div
-                  style={{
-                    fontFamily: "sans-serif",
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: "#16a34a",
-                  }}
-                >
+                <div style={{ fontFamily: "sans-serif", fontSize: 12, fontWeight: 700, color: "#16a34a" }}>
                   ▶ START
                 </div>
               </InfoWindow>
@@ -1027,90 +857,61 @@ export default function WaterloggingMap() {
                 }}
                 onCloseClick={() => setSelectedEnd(false)}
               >
-                <div
-                  style={{
-                    fontFamily: "sans-serif",
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: "#dc2626",
-                  }}
-                >
+                <div style={{ fontFamily: "sans-serif", fontSize: 12, fontWeight: 700, color: "#dc2626" }}>
                   ⬛ END
                 </div>
               </InfoWindow>
             )}
 
             {routeData.risk_analysis.high_risk_segments.map(
-              (segment: any, idx: number) => (
-                <Circle
-                  key={idx}
-                  center={{ lat: segment.lat, lng: segment.lon }}
-                  radius={100}
-                  options={{
-                    strokeColor: "#e74c3c",
-                    strokeOpacity: 0.8,
-                    strokeWeight: 2,
-                    fillColor: "#e74c3c",
-                    fillOpacity: 0.3,
-                  }}
-                  onClick={() =>
-                    setSelectedSegment(idx === selectedSegment ? null : idx)
-                  }
-                />
-              ),
-            )}
-
-            {selectedSegment !== null &&
-              routeData.risk_analysis.high_risk_segments[selectedSegment] && (
-                <InfoWindow
-                  position={{
-                    lat: routeData.risk_analysis.high_risk_segments[
-                      selectedSegment
-                    ].lat,
-                    lng: routeData.risk_analysis.high_risk_segments[
-                      selectedSegment
-                    ].lon,
-                  }}
-                  onCloseClick={() => setSelectedSegment(null)}
-                >
-                  <div
-                    style={{
-                      fontFamily: "sans-serif",
-                      fontSize: 12,
-                      color: "#1e293b",
-                      lineHeight: 1.6,
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontWeight: 700,
-                        marginBottom: 4,
-                        color: "#dc2626",
+              (segment: any, idx: number) => {
+                const centerLat = segment.lat ?? segment.centroid?.lat;
+                const centerLon = segment.lon ?? segment.centroid?.lon;
+                
+                return (
+                  <div key={idx}>
+                    <Circle
+                      center={{ lat: centerLat, lng: centerLon }}
+                      radius={100}
+                      options={{
+                        strokeColor: "#e74c3c",
+                        strokeOpacity: 0.8,
+                        strokeWeight: 2,
+                        fillColor: "#e74c3c",
+                        fillOpacity: 0.3,
                       }}
-                    >
-                      ⚠ Warning #{selectedSegment + 1}
-                    </div>
-                    <div style={{ color: "#475569" }}>
-                      Risk:{" "}
-                      <span style={{ fontWeight: 600, color: "#1e293b" }}>
-                        {
-                          routeData.risk_analysis.high_risk_segments[
-                            selectedSegment
-                          ].category
-                        }
-                      </span>
-                    </div>
-                    <div style={{ color: "#475569" }}>
-                      Score:{" "}
-                      <span style={{ fontWeight: 600, color: "#1e293b" }}>
-                        {routeData.risk_analysis.high_risk_segments[
-                          selectedSegment
-                        ].risk?.toFixed(3)}
-                      </span>
-                    </div>
+                      onClick={() =>
+                        setSelectedSegment(idx === selectedSegment ? null : idx)
+                      }
+                    />
+                    {selectedSegment === idx && (
+                      <InfoWindow
+                        position={{ lat: centerLat, lng: centerLon }}
+                        onCloseClick={() => setSelectedSegment(null)}
+                      >
+                        <div style={{ fontFamily: "sans-serif", fontSize: 12, color: "#1e293b", lineHeight: 1.6 }}>
+                          <div style={{ fontWeight: 700, marginBottom: 4, color: "#dc2626" }}>
+                            ⚠ Warning #{selectedSegment + 1}
+                          </div>
+                          <div style={{ color: "#475569" }}>
+                            Risk:{" "}
+                            <span style={{ fontWeight: 600, color: "#1e293b" }}>
+                              {segment.category}
+                            </span>
+                          </div>
+                          <div style={{ color: "#475569" }}>
+                            Score:{" "}
+                            <span style={{ fontWeight: 600, color: "#1e293b" }}>
+                              {segment.risk?.toFixed(3)}
+                            </span>
+                          </div>
+                        </div>
+                      </InfoWindow>
+                    )}
                   </div>
-                </InfoWindow>
-              )}
+                );
+              }
+            )}
           </>
         )}
 
@@ -1138,9 +939,7 @@ export default function WaterloggingMap() {
           <Marker
             key={loc.id}
             position={{ lat: loc.lat, lng: loc.lon }}
-            icon={{
-              url: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png",
-            }}
+            icon={{ url: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png" }}
             title={loc.name}
           />
         ))}
@@ -1152,7 +951,6 @@ export default function WaterloggingMap() {
 // ---------------------------------------------------------------------------
 // DraggableContainer
 // ---------------------------------------------------------------------------
-
 function DraggableContainer({
   children,
   defaultX,
@@ -1169,8 +967,7 @@ function DraggableContainer({
 
   useEffect(() => {
     const handleMove = (e: MouseEvent) => {
-      if (!dragging) return;
-      setPosition({ x: e.clientX - offset.x, y: e.clientY - offset.y });
+      if (dragging) setPosition({ x: e.clientX - offset.x, y: e.clientY - offset.y });
     };
     const handleUp = () => setDragging(false);
     if (dragging) {
@@ -1206,7 +1003,6 @@ function DraggableContainer({
 // ---------------------------------------------------------------------------
 // RoutePanelContent
 // ---------------------------------------------------------------------------
-
 function RoutePanelContent({
   onRouteCalculated,
   onClearRoute,
@@ -1220,6 +1016,21 @@ function RoutePanelContent({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [routeInfo, setRouteInfo] = useState<any>(null);
+  
+  // Assistant prefill
+  const { origin, destination, mode: prefillMode } = useRoutePrefill();
+  const [prefillBanner, setPrefillBanner] = useState<string | null>(null);
+
+  useEffect(() => {
+    const applied: string[] = [];
+    if (origin) { setStartQuery(origin); applied.push(`From: ${origin}`); }
+    if (destination) { setEndQuery(destination); applied.push(`To: ${destination}`); }
+    if (prefillMode && ["driving", "walking", "cycling"].includes(prefillMode)) {
+      setProfile(prefillMode);
+      applied.push(`Mode: ${prefillMode}`);
+    }
+    if (applied.length > 0) setPrefillBanner(`✨ ${applied.join(" · ")}`);
+  }, [origin, destination, prefillMode]);
 
   const resolveLocation = async (query: string) => {
     const res = await fetch(
@@ -1259,10 +1070,20 @@ function RoutePanelContent({
     setRouteInfo(null);
     onClearRoute();
   };
-  const presets = ["Preet Vihar", "Mayur Vihar", "Laxmi Nagar", "Gandhi Nagar"];
+  
+  const presets = ["Preet Vihar", "Mayur Vihar", "Laxmi Nagar", "Gandhi Nagar", "Karol Bagh", "Dwarka", "Rohini"];
 
   return (
     <div className="space-y-3">
+      {/* Assistant prefill banner */}
+      {prefillBanner && (
+        <div className="flex items-start gap-2 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 px-3 py-2 rounded-lg text-xs">
+          <Wand2 size={12} className="mt-0.5 flex-shrink-0" />
+          <span>{prefillBanner}</span>
+          <button onClick={() => setPrefillBanner(null)} className="ml-auto text-emerald-400 hover:text-emerald-600 flex-shrink-0">✕</button>
+        </div>
+      )}
+      
       <div>
         <div className="text-xs text-slate-500 mb-1.5">Quick locations</div>
         <div className="flex flex-wrap gap-1.5">
@@ -1270,8 +1091,7 @@ function RoutePanelContent({
             <button
               key={name}
               onClick={() => setStartQuery(name)}
-              className="text-xs px-2 py-1 rounded bg-blue-50 dark:bg-blue-950/40
-                         text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition-colors"
+              className="text-xs px-2 py-1 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition-colors"
             >
               {name}
             </button>
@@ -1288,8 +1108,7 @@ function RoutePanelContent({
           value={startQuery}
           onChange={(e) => setStartQuery(e.target.value)}
           placeholder="e.g. Connaught Place"
-          className="w-full px-2 py-1.5 border rounded text-sm bg-white dark:bg-slate-900
-                     border-slate-300 dark:border-slate-700"
+          className="w-full px-2 py-1.5 border rounded text-sm bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
         />
       </div>
 
@@ -1302,16 +1121,14 @@ function RoutePanelContent({
           value={endQuery}
           onChange={(e) => setEndQuery(e.target.value)}
           placeholder="e.g. India Gate"
-          className="w-full px-2 py-1.5 border rounded text-sm bg-white dark:bg-slate-900
-                     border-slate-300 dark:border-slate-700"
+          className="w-full px-2 py-1.5 border rounded text-sm bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
         />
       </div>
 
       <select
         value={profile}
         onChange={(e) => setProfile(e.target.value)}
-        className="w-full px-2 py-1.5 border rounded text-sm bg-white dark:bg-slate-900
-                   border-slate-300 dark:border-slate-700"
+        className="w-full px-2 py-1.5 border rounded text-sm bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
       >
         <option value="driving">Driving</option>
         <option value="walking">Walking</option>
@@ -1322,16 +1139,14 @@ function RoutePanelContent({
         <button
           onClick={handleCalculateRoute}
           disabled={loading}
-          className="flex-1 bg-blue-500 text-white py-1.5 rounded text-sm font-medium
-                     hover:bg-blue-600 disabled:opacity-50 transition-colors"
+          className="flex-1 bg-blue-500 text-white py-1.5 rounded text-sm font-medium hover:bg-blue-600 disabled:opacity-50 transition-colors"
         >
           {loading ? "Calculating..." : "Find Route"}
         </button>
         {routeInfo && (
           <button
             onClick={handleClear}
-            className="bg-red-500 text-white px-3 py-1.5 rounded text-sm font-medium
-                       hover:bg-red-600 transition-colors"
+            className="bg-red-500 text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-red-600 transition-colors"
           >
             Clear
           </button>
@@ -1339,10 +1154,7 @@ function RoutePanelContent({
       </div>
 
       {error && (
-        <div
-          className="text-xs text-red-600 bg-red-50 dark:bg-red-950/30
-                        border border-red-200 dark:border-red-900 rounded px-3 py-2"
-        >
+        <div className="text-xs text-red-600 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded px-3 py-2">
           {error}
         </div>
       )}
@@ -1372,17 +1184,17 @@ function RoutePanelContent({
             </span>
           </div>
           {routeInfo.risk_analysis.warning_count > 0 && (
-            <div
-              className="text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30
-                            border border-amber-200 dark:border-amber-900 rounded px-2 py-1.5 mt-1"
-            >
-              {routeInfo.risk_analysis.warning_count} high-risk segment
-              {routeInfo.risk_analysis.warning_count > 1 ? "s" : ""} on this
-              route
+            <div className="text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded px-2 py-1.5 mt-1">
+              ⚠️ {routeInfo.risk_analysis.warning_count} high-risk segment
+              {routeInfo.risk_analysis.warning_count > 1 ? "s" : ""} on this route
             </div>
           )}
         </div>
       )}
+
+      <div className="mt-3 text-xs text-slate-400 border-t border-slate-200 dark:border-slate-800 pt-2">
+        Tip: Use the floating assistant to pre-fill route fields by voice or text.
+      </div>
     </div>
   );
 }

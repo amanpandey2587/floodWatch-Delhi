@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^6.36.7",
+    "@deck.gl/core": "^9.2.11",
+    "@deck.gl/geo-layers": "^9.2.11",
     "@deck.gl/google-maps": "^9.2.11",
     "@deck.gl/layers": "^9.2.11",
     "@googlemaps/js-api-loader": "^2.0.2",
@@ -22,6 +24,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "deck.gl": "^9.2.11",
+    "floodwatch-delhi-frontend": "file:",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.294.0",
     "mapbox-gl": "^3.20.0",

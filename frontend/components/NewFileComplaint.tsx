@@ -1,965 +1,837 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useComplaintAPI } from "@/lib/api";
 import { useRouter } from "next/navigation";
-import {
-  Camera,
-  XCircle,
-  MapPin,
-  AlertCircle,
-  CheckCircle2,
-  Loader2,
-  Image as ImageIcon,
-  AlertTriangle,
-  Info,
-  Eye,
-  ShieldCheck,
-  ShieldAlert
-} from "lucide-react";
-import {
-  ComplaintFormData,
-  ComplaintPriority,
-  COMPLAINT_CATEGORIES,
-  PRIORITY_LABELS,
-  LocationData,
-  ImageVerificationResult,
-  ImageVerificationSummary,
-  WaterDepth
-} from "@/types/complaint";
+import { XCircle, Send, Mic, MicOff, Wand2, ImagePlus, AlertCircle, Bot, CheckCircle2, MapPin, Loader2, Navigation, ChevronDown } from "lucide-react";
+import { useComplaintPrefill } from "@/hooks/useAssistantPrefill";
 
-interface NewFileComplaintProps {
-  onSuccess?: (complaintId: string) => void;
+// ─── Language labels ──────────────────────────────────────────────────────────
+const LANG_LABELS: Record<string, Record<string, string>> = {
+  hi: {
+    title: "शीर्षक / Title", description: "विवरण / Description",
+    category: "श्रेणी / Category", ward_number: "वार्ड नंबर / Ward Number",
+    priority: "प्राथमिकता / Priority", location: "स्थान / Location",
+    photos: "फ़ोटो / Photos", submit: "शिकायत दर्ज करें", cancel: "रद्द करें",
+    placeholder_title: "जैसे: XYZ मार्केट के पास जलभराव",
+    placeholder_desc: "जलभराव की पूरी जानकारी दें...",
+    use_location: "वर्तमान स्थान उपयोग करें", location_captured: "स्थान प्राप्त हो गया",
+    filing: "दर्ज हो रहा है...",
+    chatHeader: "सहायक — बोलें या लिखें",
+    chatSub: "माइक दबाएं या टाइप करें — कोई भी भाषा",
+    inputPlaceholder: "अपनी शिकायत बोलें या यहाँ लिखें...",
+    photo_required: "फ़ोटो अनिवार्य है — कृपया बाढ़ की फ़ोटो अपलोड करें",
+    listening: "सुन रहा हूँ...",
+  },
+  ta: {
+    title: "தலைப்பு / Title", description: "விளக்கம் / Description",
+    category: "வகை / Category", ward_number: "வார்டு எண் / Ward Number",
+    priority: "முன்னுரிமை / Priority", location: "இடம் / Location",
+    photos: "புகைப்படங்கள் / Photos", submit: "புகாரை பதிவு செய்", cancel: "ரத்து செய்",
+    placeholder_title: "எ.கா: XYZ சந்தை அருகில் வெள்ளம்",
+    placeholder_desc: "வெள்ள நிலை பற்றிய விவரங்கள்...",
+    use_location: "தற்போதைய இடத்தை பயன்படுத்து", location_captured: "இடம் கிடைத்தது",
+    filing: "பதிவு செய்கிறது...",
+    chatHeader: "உதவியாளர் — பேசுங்கள் அல்லது தட்டச்சு செய்யுங்கள்",
+    chatSub: "மைக்கை அழுத்துங்கள் அல்லது தட்டச்சு செய்யுங்கள்",
+    inputPlaceholder: "உங்கள் புகாரை பேசுங்கள் அல்லது தட்டச்சு செய்யுங்கள்...",
+    photo_required: "புகைப்படம் கட்டாயம் — வெள்ள புகைப்படத்தை பதிவேற்றவும்",
+    listening: "கேட்கிறேன்...",
+  },
+  bn: {
+    title: "শিরোনাম / Title", description: "বিবরণ / Description",
+    category: "বিভাগ / Category", ward_number: "ওয়ার্ড নম্বর / Ward Number",
+    priority: "অগ্রাধিকার / Priority", location: "অবস্থান / Location",
+    photos: "ছবি / Photos", submit: "অভিযোগ দাখিল করুন", cancel: "বাতিল করুন",
+    placeholder_title: "যেমন: XYZ বাজারের কাছে জলাবদ্ধতা",
+    placeholder_desc: "জলাবদ্ধতার বিস্তারিত তথ্য দিন...",
+    use_location: "বর্তমান অবস্থান ব্যবহার করুন", location_captured: "অবস্থান পাওয়া গেছে",
+    filing: "দাখিল হচ্ছে...",
+    chatHeader: "সহায়ক — বলুন বা টাইপ করুন",
+    chatSub: "মাইক চাপুন অথবা টাইপ করুন",
+    inputPlaceholder: "আপনার অভিযোগ বলুন বা এখানে লিখুন...",
+    photo_required: "ছবি আবশ্যক — বন্যার ছবি আপলোড করুন",
+    listening: "শুনছি...",
+  },
+  en: {
+    title: "Title", description: "Description", category: "Category",
+    ward_number: "Ward Number", priority: "Priority", location: "Location",
+    photos: "Photos (required)", submit: "File Complaint", cancel: "Cancel",
+    placeholder_title: "e.g., Severe waterlogging near XYZ market",
+    placeholder_desc: "Provide detailed information about the waterlogging...",
+    use_location: "Use Current Location", location_captured: "Location Captured",
+    filing: "Filing Complaint...",
+    chatHeader: "Complaint Assistant",
+    chatSub: "Press mic to speak, or type — any language",
+    inputPlaceholder: "Speak or type your complaint here...",
+    photo_required: "Photo is mandatory — please upload a flood photo",
+    listening: "Listening...",
+  },
+};
+
+// All fields the form needs — used to track completeness
+const REQUIRED_FIELDS = ["title", "description", "category", "ward_number", "photo"] as const;
+type RequiredField = typeof REQUIRED_FIELDS[number];
+
+function detectLanguage(text: string): string {
+  if (!text || text.length < 3) return "en";
+  if (/[\u0900-\u097F]/.test(text)) return "hi";
+  if (/[\u0B80-\u0BFF]/.test(text)) return "ta";
+  if (/[\u0980-\u09FF]/.test(text)) return "bn";
+  if (/[\u0C00-\u0C7F]/.test(text)) return "te";
+  return "en";
 }
 
-const MAX_FILES = 5;
-const MAX_FILE_SIZE_MB = 5;
-const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+interface ChatMessage { role: "user" | "assistant"; content: string; isVoice?: boolean; }
+interface ExtractedFields {
+  title?: string | null; description?: string | null; category?: string | null;
+  ward_number?: number | null; priority?: string | null; fields_filled?: string[];
+}
+interface FileComplaintProps { onSuccess?: () => void; }
 
-export default function NewFileComplaint({ onSuccess }: NewFileComplaintProps) {
+declare global {
+  interface Window {
+    SpeechRecognition: typeof SpeechRecognition;
+    webkitSpeechRecognition: typeof SpeechRecognition;
+  }
+}
+
+export default function FileComplaint({ onSuccess }: FileComplaintProps) {
   const router = useRouter();
   const complaintAPI = useComplaintAPI();
 
-  // Form state
-  const [formData, setFormData] = useState<ComplaintFormData>({
-    title: "",
-    description: "",
-    category: "",
-    ward_number: 44,
-    priority: ComplaintPriority.MEDIUM,
-    location: null,
-    attachments: [],
-  });
-
-  // UI state
+  // ── Form state ──────────────────────────────────────────────────────────────
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [complaintId, setComplaintId] = useState<string | null>(null);
-  const [locationLoading, setLocationLoading] = useState(false);
-
-  // File upload state
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
-  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [photoError, setPhotoError] = useState(false);
+  const [formData, setFormData] = useState({
+    title: "", description: "", category: "",
+    ward_number: 0, priority: "medium",
+    location: null as { latitude: number; longitude: number } | null,
+  });
 
-  // Verification state
-  const [verificationResults, setVerificationResults] = useState<ImageVerificationResult[]>([]);
-  const [verificationSummary, setVerificationSummary] = useState<ImageVerificationSummary | null>(null);
-  const [showVerificationDetails, setShowVerificationDetails] = useState(false);
+  // ── Chat + language state ───────────────────────────────────────────────────
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [detectedLang, setDetectedLang] = useState("en");
+  const [filledByChat, setFilledByChat] = useState<Set<string>>(new Set());
+  const [prefillBanner, setPrefillBanner] = useState<string | null>(null);
 
-  // Validation state
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  // ── Voice state ─────────────────────────────────────────────────────────────
+  const [isListening, setIsListening] = useState(false);
+  const [interimText, setInterimText] = useState("");
+  const [voiceSupported, setVoiceSupported] = useState(false);
+  
+  // Strict mode fixes
+  const justStoppedRef = useRef(false);
+  const latestChatInputRef = useRef("");
 
-  // Field validation
-  const validateField = (name: string, value: any): string | null => {
-    switch (name) {
-      case "title":
-        if (!value || value.trim().length < 5) {
-          return "Title must be at least 5 characters";
-        }
-        if (value.trim().length > 200) {
-          return "Title must not exceed 200 characters";
-        }
-        return null;
-      case "description":
-        if (!value || value.trim().length < 10) {
-          return "Description must be at least 10 characters";
-        }
-        if (value.trim().length > 2000) {
-          return "Description must not exceed 2000 characters";
-        }
-        return null;
-      case "category":
-        if (!value) {
-          return "Please select a category";
-        }
-        return null;
-      case "ward_number":
-        const wardNum = parseInt(value);
-        if (isNaN(wardNum) || wardNum < 1 || wardNum > 272) {
-          return "Ward number must be between 1 and 272";
-        }
-        return null;
-      default:
-        return null;
-    }
-  };
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const MAX_FILES = 5;
+  const MAX_FILE_SIZE_MB = 5;
+  const L = LANG_LABELS[detectedLang] || LANG_LABELS.en;
+  const activeBcp47 = detectedLang === "hi" ? "hi-IN" : detectedLang === "ta" ? "ta-IN" : detectedLang === "bn" ? "bn-IN" : "en-IN";
 
-  const handleFieldChange = (name: string, value: any) => {
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    setTouched((prev) => ({ ...prev, [name]: true }));
-    setError(null);
-  };
-
-  const handleBlur = (name: string) => {
-    setTouched((prev) => ({ ...prev, [name]: true }));
-  };
-
-  // Get current location
-  const getCurrentLocation = useCallback(() => {
-    if (!navigator.geolocation) {
-      setError("Geolocation is not supported by your browser");
-      return;
-    }
-
-    setLocationLoading(true);
-    setError(null);
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const location: LocationData = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        };
-        setFormData((prev) => ({ ...prev, location }));
-        setLocationLoading(false);
-      },
-      (err) => {
-        console.error("Geolocation error:", err);
-        let errorMessage = "Failed to get location. ";
-        switch (err.code) {
-          case err.PERMISSION_DENIED:
-            errorMessage += "Please enable location permissions.";
-            break;
-          case err.POSITION_UNAVAILABLE:
-            errorMessage += "Location information is unavailable.";
-            break;
-          case err.TIMEOUT:
-            errorMessage += "Location request timed out.";
-            break;
-        }
-        setError(errorMessage);
-        setLocationLoading(false);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
-      }
-    );
+  // ── Check voice support ────────────────────────────────────────────────────
+  useEffect(() => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    setVoiceSupported(!!SR);
   }, []);
 
-  // File upload handlers
-  const handleFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (!e.target.files) return;
+  // ── Keep ref updated with latest input ─────────────────────────────────────
+  useEffect(() => {
+    latestChatInputRef.current = chatInput;
+  }, [chatInput]);
 
-      const filesArray = Array.from(e.target.files);
-      const validFiles: File[] = [];
-      const previews: string[] = [];
-      let errorMsg = "";
+  // ── Compute missing fields for smart prompting ─────────────────────────────
+  const getMissingFields = useCallback((): RequiredField[] => {
+    const missing: RequiredField[] = [];
+    if (!formData.title) missing.push("title");
+    if (!formData.description) missing.push("description");
+    if (!formData.category) missing.push("category");
+    if (!filledByChat.has("ward_number") && !filledByChat.has("ward_geo")) missing.push("ward_number");
+    if (selectedFiles.length === 0) missing.push("photo");
+    return missing;
+  }, [formData, selectedFiles, filledByChat]);
 
-      for (const file of filesArray) {
-        // Check file count
-        if (selectedFiles.length + validFiles.length >= MAX_FILES) {
-          errorMsg = `Maximum ${MAX_FILES} images allowed`;
-          break;
-        }
+  // ── Assistant prefill (from FloatingAssistant URL params) ──────────────────
+  const prefill = useComplaintPrefill();
 
-        // Check file type
-        if (!file.type.startsWith("image/")) {
-          errorMsg = "Only image files are allowed";
-          continue;
-        }
+  useEffect(() => {
+    const applied: string[] = [];
+    setFormData((prev) => {
+      const u = { ...prev };
+      if (prefill.description && !prev.description) { u.description = prefill.description; applied.push("description"); }
+      if (prefill.location && !prev.title) { u.title = `Waterlogging reported in ${prefill.location}`; applied.push("title"); }
+      if (prefill.wardNumber && (!prev.ward_number || prev.ward_number <= 0)) { u.ward_number = prefill.wardNumber; applied.push("ward number"); }
+      if (prefill.priority && prev.priority === "medium") { u.priority = prefill.priority; applied.push("priority"); }
+      return u;
+    });
+    if (applied.length > 0) {
+      setFilledByChat((p) => new Set([...p, ...applied.map((a) => a.replace(" ", "_"))]));
+      setPrefillBanner(`Assistant pre-filled: ${applied.join(", ")}`);
+    }
+  }, []); // eslint-disable-line
 
-        // Check file size
-        if (file.size > MAX_FILE_SIZE_BYTES) {
-          errorMsg = `Image "${file.name}" exceeds ${MAX_FILE_SIZE_MB}MB limit`;
-          continue;
-        }
+  // ── Boot message — context-aware ───────────────────────────────────────────
+  useEffect(() => {
+    const locationHint = prefill.location ? ` I've noted **${prefill.location}** as the location.` : "";
+    setMessages([{
+      role: "assistant",
+      content: `Hello! Describe the flooding situation and I will help fill the form automatically.${locationHint}\n\nPress the microphone to speak in Hindi, Tamil, Bengali, or English, or simply type your issue.\n\nRequired details:\n• Location & description\n• Ward number\n• Category\n• Priority\n• Photo evidence\n\nPlease provide as much detail as possible.`,
+    }]);
+  }, []); // eslint-disable-line
 
-        validFiles.push(file);
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, interimText]);
 
-        // Create preview
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          previews.push(reader.result as string);
-          if (previews.length === validFiles.length) {
-            setSelectedFiles((prev) => [...prev, ...validFiles]);
-            setImagePreviews((prev) => [...prev, ...previews]);
-          }
-        };
-        reader.readAsDataURL(file);
+  // ── Voice recognition ──────────────────────────────────────────────────────
+  const startListening = useCallback(() => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return;
+    const recognition = new SR();
+    recognitionRef.current = recognition;
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = activeBcp47;
+
+    recognition.onstart = () => { setIsListening(true); setInterimText(""); };
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let interim = "";
+      let final = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const t = event.results[i][0].transcript;
+        if (event.results[i].isFinal) final += t;
+        else interim += t;
       }
+      setInterimText(interim);
+      if (final) { setChatInput((p) => (p + " " + final).trim()); setInterimText(""); }
+    };
 
-      if (errorMsg) {
-        setError(errorMsg);
-      } else {
-        setError(null);
-      }
+    recognition.onerror = () => { setIsListening(false); setInterimText(""); };
 
-      // Reset input
-      e.target.value = "";
-    },
-    [selectedFiles]
-  );
+    recognition.onend = () => {
+      setIsListening(false);
+      setInterimText("");
+      justStoppedRef.current = true;
+    };
 
-  const handleRemoveImage = useCallback((index: number) => {
-    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
-    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
-    // Also remove verification result for this image
-    setVerificationResults((prev) => prev.filter((_, i) => i !== index));
+    recognition.start();
+  }, [activeBcp47]);
+
+  const stopListening = useCallback(() => {
+    recognitionRef.current?.stop();
+    setIsListening(false);
+    setInterimText("");
   }, []);
 
-  // Convert files to base64
-  const convertFilesToBase64 = async (files: File[]): Promise<string[]> => {
-    const base64Array: string[] = [];
+  // ── Send chat message ──────────────────────────────────────────────────────
+  const sendChatWithText = useCallback(async (text: string, isVoice = false) => {
+    if (!text || chatLoading) return;
+    const lang = detectLanguage(text);
+    if (lang !== "en") setDetectedLang(lang);
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = (error) => reject(error);
-        reader.onprogress = (e) => {
-          if (e.lengthComputable) {
-            const progress = Math.round(
-              ((i + e.loaded / e.total) / files.length) * 100
-            );
-            setUploadProgress(progress);
-          }
-        };
-        reader.readAsDataURL(file);
+    const userMsg: ChatMessage = { role: "user", content: text, isVoice };
+    setMessages((p) => [...p, userMsg]);
+    setChatInput("");
+    setInterimText("");
+    setChatLoading(true);
+    if (chatTextareaRef.current) chatTextareaRef.current.style.height = "auto";
+
+    const currentMissing = getMissingFields();
+
+    try {
+      const res = await fetch("/api/complaint-assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [...messages, userMsg],
+          currentFormState: {
+            title: formData.title,
+            description: formData.description,
+            category: formData.category,
+            ward_number: formData.ward_number,
+            priority: formData.priority,
+            photo_uploaded: selectedFiles.length > 0,
+            missing_fields: currentMissing,
+          },
+        }),
       });
-      base64Array.push(base64);
-    }
 
-    return base64Array;
+      const data = await res.json();
+      if (data.error) { setMessages((p) => [...p, { role: "assistant", content: `Error: ${data.error}` }]); return; }
+
+      setMessages((p) => [...p, { role: "assistant", content: data.reply }]);
+
+      if (data.extracted) {
+        const newly: string[] = [];
+        setFormData((prev) => {
+          const u = { ...prev };
+          if (data.extracted.title && !prev.title) { u.title = data.extracted.title; newly.push("title"); }
+          if (data.extracted.description && !prev.description) { u.description = data.extracted.description; newly.push("description"); }
+          if (data.extracted.category && !prev.category) { u.category = data.extracted.category; newly.push("category"); }
+          if (data.extracted.ward_number && data.extracted.ward_number !== prev.ward_number) { u.ward_number = data.extracted.ward_number; newly.push("ward_number"); }
+          if (data.extracted.priority && prev.priority === "medium") { u.priority = data.extracted.priority.toLowerCase(); newly.push("priority"); }
+          return u;
+        });
+        if (newly.length) setFilledByChat((p) => new Set([...p, ...newly]));
+      }
+    } catch {
+      setMessages((p) => [...p, { role: "assistant", content: "Connection error. Please try again." }]);
+    } finally { setChatLoading(false); }
+  }, [chatLoading, messages, formData, selectedFiles, getMissingFields]);
+
+  // Auto-send after voice stops
+  useEffect(() => {
+    if (justStoppedRef.current) {
+      justStoppedRef.current = false;
+      const t = setTimeout(() => {
+        const currentText = latestChatInputRef.current;
+        if (currentText.trim()) {
+          sendChatWithText(currentText.trim(), true);
+        }
+      }, 700);
+      return () => clearTimeout(t);
+    }
+  }, [isListening, sendChatWithText]);
+
+  const sendChat = useCallback(() => {
+    sendChatWithText(chatInput.trim(), false);
+  }, [chatInput, sendChatWithText]);
+
+  // ── File handlers ───────────────────────────────────────────────────────────
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const newFiles: File[] = [];
+    const newPreviews: string[] = [];
+    Array.from(e.target.files).forEach((file) => {
+      if (selectedFiles.length + newFiles.length >= MAX_FILES) { setError(`Maximum ${MAX_FILES} images allowed.`); return; }
+      if (!file.type.startsWith("image/")) { setError("Only image files are allowed."); return; }
+      if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) { setError(`Image must be under ${MAX_FILE_SIZE_MB}MB.`); return; }
+      newFiles.push(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        newPreviews.push(reader.result as string);
+        if (newPreviews.length === newFiles.length) {
+          setSelectedFiles((p) => [...p, ...newFiles]);
+          setImagePreviews((p) => [...p, ...newPreviews]);
+          setError(null);
+          setPhotoError(false);
+          setFilledByChat((p) => new Set([...p, "photo"]));
+          
+          const rem = getMissingFields().filter(f => f !== "photo");
+          setMessages((p) => [...p, {
+            role: "assistant",
+            content: `Photo uploaded (${newFiles.length} image(s) added as evidence).\n\n${rem.length === 0 ? "All fields complete. You can now submit." : `Still needed: **${rem.join(", ")}**`}`,
+          }]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
-  // Form validation
-  const validateForm = (): boolean => {
-    const errors: string[] = [];
-
-    const titleError = validateField("title", formData.title);
-    if (titleError) errors.push(titleError);
-
-    const descError = validateField("description", formData.description);
-    if (descError) errors.push(descError);
-
-    const categoryError = validateField("category", formData.category);
-    if (categoryError) errors.push(categoryError);
-
-    const wardError = validateField("ward_number", formData.ward_number);
-    if (wardError) errors.push(wardError);
-
-    if (errors.length > 0) {
-      setError(errors.join(". "));
-      return false;
-    }
-
-    return true;
+  const handleRemoveImage = (i: number) => {
+    setSelectedFiles((p) => p.filter((_, idx) => idx !== i));
+    setImagePreviews((p) => p.filter((_, idx) => idx !== i));
   };
 
-  // Form submission
+  // ── Submit ──────────────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Mark all fields as touched
-    setTouched({
-      title: true,
-      description: true,
-      category: true,
-      ward_number: true,
-    });
-
-    // Validate form
-    if (!validateForm()) {
+    if (selectedFiles.length === 0) {
+      setPhotoError(true);
+      setError(L.photo_required);
+      setMessages((p) => [...p, {
+        role: "assistant",
+        content: detectedLang === "hi"
+          ? "फ़ोटो अनिवार्य है। कृपया बाढ़ की कोई फ़ोटो अपलोड करें।"
+          : "A photo is required to submit. Please upload at least one photo showing the flooding.",
+      }]);
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
       return;
     }
 
-    setLoading(true);
-    setError(null);
-    setSuccess(false);
-    setUploadProgress(0);
-
+    setLoading(true); setError(null); setSuccess(false);
     try {
-      // Convert images to base64
-      const attachments = selectedFiles.length > 0
-        ? await convertFilesToBase64(selectedFiles)
-        : [];
-
-      // Prepare payload
-      const payload = {
-        title: formData.title.trim(),
-        description: formData.description.trim(),
-        category: formData.category,
-        ward_number: formData.ward_number,
-        priority: formData.priority,
-        location: formData.location,
-        attachments,
-        water_depth: formData.water_depth,
-      };
-
-      console.log("Filing complaint with payload:", payload);
-
-      // Submit complaint (backend will handle verification)
-      const result = await complaintAPI.fileComplaint(payload);
-
-      console.log("Complaint filed successfully:", result);
-
-      // Extract verification results from response
-      if (result.image_verification) {
-        setVerificationResults(result.image_verification.results || []);
-        setVerificationSummary(result.image_verification.summary || null);
+      const attachments: string[] = [];
+      for (const file of selectedFiles) {
+        const base64 = await new Promise<string>((res, rej) => {
+          const r = new FileReader();
+          r.onload = () => res(r.result as string);
+          r.onerror = (err) => rej(err);
+          r.readAsDataURL(file);
+        });
+        attachments.push(base64);
       }
-
-      // Success!
+      const result = await complaintAPI.fileComplaint({ ...formData, attachments });
       setComplaintId(result.complaint_id);
       setSuccess(true);
-      setUploadProgress(100);
-
-      // Call success callback or redirect
-      if (onSuccess) {
-        onSuccess(result.complaint_id);
-      } else {
-        setTimeout(() => {
-          router.push(`/complaints/track/${result.complaint_id}`);
-        }, 3000);
-      }
+      setMessages((p) => [...p, {
+        role: "assistant",
+        content: `Complaint filed successfully. Your ID is **${result.complaint_id}**. Redirecting...`,
+      }]);
+      if (onSuccess) { onSuccess(); } else { setTimeout(() => router.push(`/complaints/track/${result.complaint_id}`), 2500); }
     } catch (err: any) {
-      console.error("Complaint filing error:", err);
-      console.error("Error response:", err.response?.data);
-
-      // Handle different error types
       if (err.response?.status === 422) {
-        const validationErrors = err.response?.data?.detail;
-        if (Array.isArray(validationErrors)) {
-          const errorMessages = validationErrors
-            .map((e: any) => {
-              const field = e.loc[e.loc.length - 1];
-              return `${field}: ${e.msg}`;
-            })
-            .join(", ");
-          setError(`Validation error: ${errorMessages}`);
-        } else {
-          setError("Invalid data submitted. Please check all fields.");
-        }
-      } else if (err.response?.status === 503) {
-        setError(
-          "Service temporarily unavailable. Please check your database connection and try again."
-        );
-      } else {
-        setError(
-          err.response?.data?.detail ||
-          err.message ||
-          "Failed to file complaint. Please try again."
-        );
-      }
-    } finally {
-      setLoading(false);
-    }
+        const ve = err.response?.data?.detail;
+        setError(Array.isArray(ve) ? `Validation error: ${ve.map((e: any) => `${e.loc.join(".")}: ${e.msg}`).join(", ")}` : "Invalid data submitted.");
+      } else { setError(err.response?.data?.detail || "Failed to file complaint. Please try again."); }
+    } finally { setLoading(false); }
   };
 
-  // Helper function to get severity badge color
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case "CRITICAL": return "bg-red-100 text-red-800 border-red-200";
-      case "HIGH": return "bg-orange-100 text-orange-800 border-orange-200";
-      case "MODERATE": return "bg-yellow-100 text-yellow-800 border-yellow-200";
-      case "LOW": return "bg-blue-100 text-blue-800 border-blue-200";
-      default: return "bg-gray-100 text-gray-800 border-gray-200";
-    }
+  const [locationLoading, setLocationLoading] = useState(false);
+
+  const getCurrentLocation = () => {
+    if (!navigator.geolocation) { setError("Geolocation not supported."); return; }
+    setLocationLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setFormData((prev) => ({ ...prev, location: { latitude: lat, longitude: lng } }));
+
+        try {
+          const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+          const res = await fetch(
+            `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${key}`
+          );
+          const data = await res.json();
+          if (data.results?.length > 0) {
+            const result = data.results[0];
+
+            const locality =
+              result.address_components?.find((c: any) =>
+                c.types.includes("sublocality_level_1") || c.types.includes("locality")
+              )?.long_name || "";
+
+            const wardMatch = result.formatted_address?.match(/Ward\s*(\d+)/i) ||
+              result.formatted_address?.match(/W-(\d+)/i);
+            const wardNum = wardMatch ? parseInt(wardMatch[1]) : null;
+
+            setFormData((prev) => ({
+              ...prev,
+              location: { latitude: lat, longitude: lng },
+              ...(wardNum && (!prev.ward_number || prev.ward_number <= 0)
+                ? { ward_number: wardNum }
+                : {}),
+              ...(!prev.title && locality
+                ? { title: `Waterlogging reported in ${locality}` }
+                : {}),
+            }));
+
+            if (wardNum) {
+              setFilledByChat((p) => new Set([...p, "ward_number", "location"]));
+              setMessages((p) => [...p, {
+                role: "assistant",
+                content: `Location detected: **${locality || "your area"}**.\nWard **${wardNum}** identified. What other details can you share?`,
+              }]);
+            } else {
+              setFilledByChat((p) => new Set([...p, "location"]));
+              setMessages((p) => [...p, {
+                role: "assistant",
+                content: `Location captured: **${locality || `${lat.toFixed(4)}, ${lng.toFixed(4)}`}**.\nI couldn't auto-detect your ward number. Could you provide it? (1–272)`,
+              }]);
+            }
+          }
+        } catch {
+          setFilledByChat((p) => new Set([...p, "location"]));
+        } finally {
+          setLocationLoading(false);
+        }
+      },
+      () => { setError("Failed to get location."); setLocationLoading(false); },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
   };
+
+  const handleChatKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); }
+  };
+
+  const autoResize = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setChatInput(e.target.value);
+    e.target.style.height = "auto";
+    e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+  };
+
+  const fieldHighlight = (key: string) =>
+    filledByChat.has(key)
+      ? "border-cyan-400 dark:border-cyan-600 ring-1 ring-cyan-100 dark:ring-cyan-900/30"
+      : "border-slate-200 dark:border-slate-700";
+
+  const labelClass = "block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5";
+  
+  // Note: opacity removed from background colors here so native <option> menus render solidly
+  const inputBase = "w-full px-4 py-2.5 rounded-xl border text-sm transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400";
+
+  const missingFields = getMissingFields();
+  const completedCount = REQUIRED_FIELDS.length - missingFields.length;
+  const progressPct = Math.round((completedCount / REQUIRED_FIELDS.length) * 100);
 
   return (
-    <div className="max-w-4xl mx-auto text-slate-900 dark:text-slate-100">
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-lg p-8 border border-slate-200 dark:border-slate-800">
-        <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
-          File a New Complaint
-        </h2>
-        <p className="text-slate-600 dark:text-slate-300 mb-8">
-          Report waterlogging, drainage issues, or other civic problems in your ward
-        </p>
+    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white relative overflow-hidden">
+      
+      {/* ── Ambient Background Blobs (Matches Home) ── */}
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-40 right-0 h-96 w-96 rounded-full bg-cyan-300/30 blur-3xl dark:bg-cyan-500/10"></div>
+        <div className="absolute top-32 -left-20 h-80 w-80 rounded-full bg-blue-300/30 blur-3xl dark:bg-blue-600/10"></div>
+        <div className="absolute bottom-0 left-1/3 h-[28rem] w-[28rem] rounded-full bg-indigo-300/20 blur-3xl dark:bg-indigo-500/10"></div>
+      </div>
 
-        {/* Error Alert */}
-        {error && (
-          <div className="mb-6 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-300 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <h3 className="text-sm font-semibold text-red-900 dark:text-red-200 mb-1">
-                Error filing complaint
-              </h3>
-              <p className="text-sm text-red-700 dark:text-red-200">{error}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Success Alert with Verification Summary */}
-        {success && complaintId && (
-          <div className="mb-6 space-y-4">
-            <div className="bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800 rounded-lg p-4 flex items-start gap-3">
-              <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-300 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-green-900 dark:text-green-200 mb-1">
-                  Complaint filed successfully!
-                </h3>
-                <p className="text-sm text-green-700 dark:text-green-200">
-                  Your complaint ID is:{" "}
-                  <span className="font-mono font-semibold">{complaintId}</span>
-                </p>
-                <p className="text-xs text-green-600 dark:text-green-300 mt-1">
-                  Redirecting to tracking page...
-                </p>
-              </div>
-            </div>
-
-            {/* Verification Summary */}
-            {verificationSummary && verificationSummary.total_images > 0 && (
-              <div className="bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <ShieldCheck className="w-5 h-5 text-blue-600 dark:text-blue-300 flex-shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-2">
-                      AI Verification Complete
-                    </h3>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <span className="text-blue-700 dark:text-blue-300">Total Images:</span>{" "}
-                        <span className="font-semibold text-blue-900 dark:text-blue-200">
-                          {verificationSummary.total_images}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-blue-700 dark:text-blue-300">Verified:</span>{" "}
-                        <span className="font-semibold text-green-900 dark:text-green-200">
-                          {verificationSummary.verified_count}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-blue-700 dark:text-blue-300">Confidence:</span>{" "}
-                        <span className="font-semibold text-blue-900 dark:text-blue-200">
-                          {verificationSummary.average_confidence}%
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-blue-700 dark:text-blue-300">Verification Rate:</span>{" "}
-                        <span className="font-semibold text-blue-900 dark:text-blue-200">
-                          {verificationSummary.verification_rate}%
-                        </span>
-                      </div>
-                    </div>
-
-                    {verificationSummary.has_critical && (
-                      <div className="mt-2 flex items-center gap-2 text-sm text-red-700 dark:text-red-200">
-                        <AlertTriangle className="w-4 h-4" />
-                        <span>Critical waterlogging detected in images</span>
-                      </div>
-                    )}
-
-                    <button
-                      onClick={() => setShowVerificationDetails(!showVerificationDetails)}
-                      className="mt-3 text-sm text-blue-600 dark:text-blue-300 hover:text-blue-700 font-medium flex items-center gap-1"
-                    >
-                      <Eye className="w-4 h-4" />
-                      {showVerificationDetails ? "Hide" : "View"} detailed results
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Detailed Verification Results */}
-            {showVerificationDetails && verificationResults.length > 0 && (
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4">
-                <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">
-                  Verification Results Per Image
-                </h4>
-                <div className="space-y-3">
-                  {verificationResults.map((result, index) => (
-                    <div
-                      key={index}
-                      className={`p-3 rounded-lg border ${result.passed
-                          ? "bg-green-50 border-green-200"
-                          : "bg-orange-50 border-orange-200"
-                        }`}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <span className="text-sm font-medium text-gray-900">
-                          Image {index + 1}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`text-xs px-2 py-1 rounded border ${getSeverityColor(
-                              result.severity
-                            )}`}
-                          >
-                            {result.severity}
-                          </span>
-                          <span className="text-xs text-gray-600">
-                            {result.confidence}% confidence
-                          </span>
-                        </div>
-                      </div>
-
-                      <p className="text-sm text-gray-700 mb-2">
-                        {result.reasoning}
-                      </p>
-
-                      {result.detected_issues.length > 0 && (
-                        <div className="text-xs text-gray-600">
-                          <span className="font-medium">Detected: </span>
-                          {result.detected_issues.join(", ")}
-                        </div>
-                      )}
-
-                      {result.false_positive_reason && (
-                        <div className="text-xs text-orange-700 mt-1">
-                          <span className="font-medium">Note: </span>
-                          {result.false_positive_reason}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Title */}
-          <div>
-            <label
-              htmlFor="title"
-              className="block text-sm font-medium text-gray-700 mb-2"
-            >
-              Title <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              id="title"
-              value={formData.title}
-              onChange={(e) => handleFieldChange("title", e.target.value)}
-              onBlur={() => handleBlur("title")}
-              disabled={loading}
-              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${touched.title && validateField("title", formData.title)
-                  ? "border-red-300 bg-red-50"
-                  : "border-gray-300"
-                }`}
-              placeholder="e.g., Severe waterlogging near XYZ market"
-            />
-            {touched.title && validateField("title", formData.title) && (
-              <p className="mt-1 text-sm text-red-600">
-                {validateField("title", formData.title)}
-              </p>
-            )}
-            <p className="mt-1 text-xs text-gray-500">
-              {formData.title.length}/200 characters
-            </p>
-          </div>
-
-          {/* Description */}
-          <div>
-            <label
-              htmlFor="description"
-              className="block text-sm font-medium text-gray-700 mb-2"
-            >
-              Description <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) =>
-                handleFieldChange("description", e.target.value)
-              }
-              onBlur={() => handleBlur("description")}
-              disabled={loading}
-              rows={5}
-              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none ${touched.description &&
-                  validateField("description", formData.description)
-                  ? "border-red-300 bg-red-50"
-                  : "border-gray-300"
-                }`}
-              placeholder="Provide detailed information about the issue, including landmarks, severity, and any immediate dangers..."
-            />
-            {touched.description &&
-              validateField("description", formData.description) && (
-                <p className="mt-1 text-sm text-red-600">
-                  {validateField("description", formData.description)}
-                </p>
-              )}
-            <p className="mt-1 text-xs text-gray-500">
-              {formData.description.length}/2000 characters
-            </p>
-          </div>
-
-          {/* Category and Ward - Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Category */}
+      <div className="relative z-10 flex flex-col h-screen">
+        
+        {/* Header */}
+        <div className="px-6 py-5 border-b border-slate-200/50 dark:border-slate-800/50 bg-white/50 dark:bg-slate-950/50 backdrop-blur-md">
+          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <label
-                htmlFor="category"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Category <span className="text-red-500">*</span>
-              </label>
-              <select
-                id="category"
-                value={formData.category}
-                onChange={(e) => handleFieldChange("category", e.target.value)}
-                onBlur={() => handleBlur("category")}
-                disabled={loading}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${touched.category &&
-                    validateField("category", formData.category)
-                    ? "border-red-300 bg-red-50"
-                    : "border-gray-300"
-                  }`}
-              >
-                <option value="">Select a category</option>
-                {COMPLAINT_CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
-              {touched.category &&
-                validateField("category", formData.category) && (
-                  <p className="mt-1 text-sm text-red-600">
-                    {validateField("category", formData.category)}
-                  </p>
-                )}
-            </div>
-
-            {/* Ward Number */}
-            <div>
-              <label
-                htmlFor="ward_number"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Ward Number <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                id="ward_number"
-                value={formData.ward_number}
-                onChange={(e) =>
-                  handleFieldChange("ward_number", parseInt(e.target.value))
-                }
-                onBlur={() => handleBlur("ward_number")}
-                disabled={loading}
-                min="1"
-                max="272"
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${touched.ward_number &&
-                    validateField("ward_number", formData.ward_number)
-                    ? "border-red-300 bg-red-50"
-                    : "border-gray-300"
-                  }`}
-              />
-              {touched.ward_number &&
-                validateField("ward_number", formData.ward_number) && (
-                  <p className="mt-1 text-sm text-red-600">
-                    {validateField("ward_number", formData.ward_number)}
-                  </p>
-                )}
-              <p className="mt-1 text-xs text-gray-500">
-                Valid range: 1-272
+              <h1 className="font-bold text-xl tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                <Navigation className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+                File a Complaint
+              </h1>
+              <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
+                {detectedLang !== "en" ? "Multilingual Voice Assistant Active" : "Report infrastructure and waterlogging issues"}
               </p>
             </div>
-          </div>
 
-          {/* Priority */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Priority
-            </label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {Object.entries(PRIORITY_LABELS).map(([value, { label, color }]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() =>
-                    handleFieldChange("priority", value as ComplaintPriority)
-                  }
-                  disabled={loading}
-                  className={`px-4 py-3 rounded-lg font-medium border-2 transition-all ${formData.priority === value
-                      ? `${color} border-current`
-                      : "bg-white border-gray-300 text-gray-700 hover:border-gray-400"
-                    }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Water Depth */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Water Depth (Optional)
-            </label>
-            <p className="text-xs text-gray-500 mb-3">
-              Select the approximate depth of waterlogging for accurate assessment
-            </p>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              {[
-                { value: WaterDepth.ANKLE_DEEP, label: "Ankle Deep", desc: "<6 inches" },
-                { value: WaterDepth.KNEE_DEEP, label: "Knee Deep", desc: "6-18 inches" },
-                { value: WaterDepth.TYRE_DEEP, label: "Tyre Deep", desc: "18-24 inches" },
-                { value: WaterDepth.HOOD_DEEP, label: "Hood Deep", desc: "24-36 inches" },
-                { value: WaterDepth.FULLY_SUBMERGED, label: "Submerged", desc: ">36 inches" },
-              ].map(({ value, label, desc }) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => handleFieldChange("water_depth", value)}
-                  disabled={loading}
-                  className={`px-3 py-3 rounded-lg font-medium border-2 transition-all text-sm ${formData.water_depth === value
-                      ? "bg-blue-50 text-blue-700 border-blue-500"
-                      : "bg-white border-gray-300 text-gray-700 hover:border-blue-300 hover:bg-blue-50/30"
-                    }`}
-                >
-                  <div className="text-center">
-                    <div className="mb-1">{label}</div>
-                    <div className="text-xs text-gray-500">{desc}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-            {formData.water_depth && (
-              <div className="mt-2 flex items-center gap-2">
-                <span className="text-xs text-gray-600">Selected:</span>
-                <span className="text-sm font-semibold text-blue-600">{formData.water_depth}</span>
-                <button
-                  type="button"
-                  onClick={() => handleFieldChange("water_depth", null)}
-                  disabled={loading}
-                  className="text-xs text-gray-500 hover:text-gray-700 underline"
-                >
-                  Clear
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Location */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Location (Optional)
-            </label>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                type="button"
-                onClick={getCurrentLocation}
-                disabled={loading || locationLoading}
-                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {locationLoading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Getting location...
-                  </>
-                ) : formData.location ? (
-                  <>
-                    <CheckCircle2 className="w-5 h-5 text-green-600" />
-                    Location Captured
-                  </>
-                ) : (
-                  <>
-                    <MapPin className="w-5 h-5" />
-                    Use Current Location
-                  </>
-                )}
-              </button>
-              {formData.location && (
-                <button
-                  type="button"
-                  onClick={() => handleFieldChange("location", null)}
-                  disabled={loading}
-                  className="px-4 py-3 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-            {formData.location && (
-              <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <MapPin className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
-                  <div className="text-sm text-green-800">
-                    <p className="font-medium">Location coordinates captured</p>
-                    <p className="text-xs mt-1 font-mono">
-                      {formData.location.latitude.toFixed(6)},{" "}
-                      {formData.location.longitude.toFixed(6)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Photo Upload with AI Verification Info */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-medium text-gray-700">
-                Photos (Optional, max {MAX_FILES})
-              </label>
-              <div className="flex items-center gap-1 text-xs text-blue-600">
-                <ShieldCheck className="w-4 h-4" />
-                <span>AI-verified</span>
-              </div>
-            </div>
-
-            {/* AI Verification Info Banner */}
-            <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <div className="flex items-start gap-2">
-                <Info className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
-                <div className="text-xs text-blue-800">
-                  <p className="font-medium mb-1">AI Image Verification Enabled</p>
-                  <p>
-                    Images will be automatically verified for waterlogging detection using
-                    AI. This helps ensure accurate reporting and faster response times.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <label
-                htmlFor="file-upload"
-                className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${selectedFiles.length >= MAX_FILES
-                    ? "border-gray-300 bg-gray-50 cursor-not-allowed"
-                    : "border-gray-300 bg-gray-50 hover:bg-gray-100"
-                  }`}
-              >
-                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  <Camera className="w-10 h-10 text-gray-400 mb-2" />
-                  <p className="text-sm text-gray-600 font-medium">
-                    {selectedFiles.length >= MAX_FILES
-                      ? `Maximum ${MAX_FILES} images reached`
-                      : "Click to upload photos"}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    PNG, JPG up to {MAX_FILE_SIZE_MB}MB each
-                  </p>
-                </div>
-                <input
-                  id="file-upload"
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleFileChange}
-                  disabled={loading || selectedFiles.length >= MAX_FILES}
-                  className="hidden"
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                {completedCount} of {REQUIRED_FIELDS.length} fields completed
+              </span>
+              <div className="h-1.5 w-32 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-cyan-500 dark:bg-cyan-400 rounded-full transition-all duration-500 ease-out" 
+                  style={{ width: `${progressPct}%` }} 
                 />
-              </label>
+              </div>
+            </div>
+          </div>
+        </div>
 
-              {/* Upload Progress */}
-              {loading && uploadProgress > 0 && uploadProgress < 100 && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Processing images...</span>
-                    <span className="text-gray-900 font-medium">
-                      {uploadProgress}%
+        {/* Main Content */}
+        <div className="flex-1 max-w-6xl w-full mx-auto p-4 md:p-6 flex flex-col lg:flex-row gap-6 min-h-0">
+
+          {/* ── CHAT + VOICE PANEL ─────────────────────────────────────────────── */}
+          <div className="flex flex-col w-full lg:w-[380px] lg:flex-shrink-0 bg-white/80 dark:bg-slate-900/70 backdrop-blur-md rounded-2xl shadow-lg border border-slate-200 dark:border-slate-800 overflow-hidden h-full">
+
+            {/* Chat header */}
+            <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3 bg-slate-50/50 dark:bg-slate-900/50">
+              <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center flex-shrink-0">
+                <Bot size={16} className="text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{L.chatHeader}</h2>
+                <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">{L.chatSub}</p>
+              </div>
+            </div>
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+              {messages.map((msg, i) => (
+                <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div className={`max-w-[88%] px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm ${
+                    msg.role === "user"
+                      ? "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-br-sm"
+                      : "bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-bl-sm"
+                  }`}>
+                    {msg.isVoice && (
+                      <span className="flex items-center gap-1.5 text-xs opacity-70 mb-1.5 font-medium">
+                        <Mic size={12} /> Voice Input
+                      </span>
+                    )}
+                    {msg.content.split("\n").map((line, j) => (
+                      <span key={j}>
+                        {line.split(/\*\*(.*?)\*\*/g).map((p, k) =>
+                          k % 2 === 1 ? <strong key={k} className="font-semibold">{p}</strong> : p
+                        )}
+                        {j < msg.content.split("\n").length - 1 && <br />}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {/* Interim voice bubble */}
+              {interimText && (
+                <div className="flex justify-end">
+                  <div className="max-w-[88%] px-4 py-3 rounded-2xl rounded-br-sm bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-sm border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <span className="flex items-center gap-2 text-xs font-medium mb-1">
+                      <span className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-pulse inline-block" />
+                      Transcribing...
                     </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                    <div
-                      className="bg-blue-600 h-2 transition-all duration-300"
-                      style={{ width: `${uploadProgress}%` }}
-                    />
+                    {interimText}
                   </div>
                 </div>
               )}
 
-              {/* Image Previews */}
-              {imagePreviews.length > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-                  {imagePreviews.map((preview, index) => (
-                    <div
-                      key={index}
-                      className="relative group aspect-square rounded-lg overflow-hidden shadow-md"
-                    >
-                      <img
-                        src={preview}
-                        alt={`Preview ${index + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveImage(index)}
-                        disabled={loading}
-                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 disabled:opacity-50"
-                        aria-label="Remove image"
-                      >
-                        <XCircle className="w-4 h-4" />
-                      </button>
-                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-2">
-                        <p className="text-xs text-white font-medium truncate">
-                          {selectedFiles[index]?.name}
-                        </p>
-                        <p className="text-xs text-white/80">
-                          {(selectedFiles[index]?.size / 1024).toFixed(0)} KB
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+              {chatLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-500 dark:text-slate-400 text-xs px-4 py-3 rounded-2xl rounded-bl-sm flex items-center gap-2 shadow-sm">
+                    <Loader2 size={14} className="animate-spin" /> Processing details...
+                  </div>
                 </div>
               )}
+
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Status Bar */}
+            <div className="px-4 py-2 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-xs">
+              {missingFields.length > 0 ? (
+                <span className="text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                  Pending: {missingFields.join(", ").replace(/_/g, " ")}
+                </span>
+              ) : (
+                <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5">
+                  <CheckCircle2 size={12} />
+                  Ready to submit
+                </span>
+              )}
+            </div>
+
+            {/* Listening indicator */}
+            {isListening && (
+              <div className="mx-4 mb-2 flex items-center gap-3 bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-800/50 px-4 py-3 rounded-xl flex-shrink-0">
+                <span className="flex gap-0.5 items-end h-4">
+                  {[1, 2, 3, 4].map((b) => (
+                    <span key={b} className="w-1 bg-cyan-500 rounded-full animate-bounce"
+                      style={{ height: `${6 + b * 2}px`, animationDelay: `${b * 0.08}s` }} />
+                  ))}
+                </span>
+                <span className="text-xs text-cyan-700 dark:text-cyan-400 font-medium flex-1">{L.listening}</span>
+                <button onClick={stopListening} className="text-xs text-cyan-600 hover:text-cyan-800 dark:hover:text-cyan-200 font-semibold">Stop</button>
+              </div>
+            )}
+
+            {/* Input area */}
+            <div className="p-3 border-t border-slate-200 dark:border-slate-800 flex gap-2 items-end bg-white dark:bg-slate-900">
+              <textarea
+                ref={chatTextareaRef}
+                value={chatInput}
+                onChange={autoResize}
+                onKeyDown={handleChatKey}
+                placeholder={isListening ? L.listening : L.inputPlaceholder}
+                rows={1}
+                disabled={chatLoading || isListening}
+                className="flex-1 resize-none bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 min-h-[44px] max-h-[120px] disabled:opacity-50"
+              />
+
+              {voiceSupported && (
+                <button
+                  type="button"
+                  onClick={isListening ? stopListening : startListening}
+                  disabled={chatLoading}
+                  className={`p-3 rounded-xl transition-all flex-shrink-0 relative ${
+                    isListening
+                      ? "bg-cyan-500 text-white shadow-md shadow-cyan-500/20"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                  } disabled:opacity-40`}
+                >
+                  {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                </button>
+              )}
+
+              <button
+                onClick={sendChat}
+                disabled={chatLoading || !chatInput.trim() || isListening}
+                className="bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-white disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 text-white dark:text-slate-900 p-3 rounded-xl transition-colors flex-shrink-0"
+              >
+                <Send size={16} />
+              </button>
             </div>
           </div>
 
-          {/* Form Actions */}
-          <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t">
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Filing Complaint...
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-5 h-5" />
-                  File Complaint
-                </>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => router.back()}
-              disabled={loading}
-              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
-            >
-              Cancel
-            </button>
-          </div>
+          {/* ── FORM PANEL ─────────────────────────────────────────────────────── */}
+          <div className="flex-1 overflow-y-auto pr-1">
+            <div className="bg-white/80 dark:bg-slate-900/70 backdrop-blur-md rounded-2xl shadow-lg border border-slate-200 dark:border-slate-800 p-6 md:p-8">
 
-          {/* Help Text */}
-          <div className="pt-4 border-t">
-            <p className="text-sm text-gray-600">
-              <span className="text-red-500">*</span> Required fields
-            </p>
-            <p className="text-xs text-gray-500 mt-2">
-              Your complaint will be assigned to the ward officer for immediate action.
-              Images are automatically verified using AI to ensure accurate reporting.
-            </p>
+              {prefillBanner && (
+                <div className="mb-6 flex items-start gap-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/50 text-indigo-700 dark:text-indigo-300 px-4 py-3 rounded-xl text-sm">
+                  <Wand2 size={16} className="mt-0.5 flex-shrink-0" />
+                  <span className="font-medium">{prefillBanner}</span>
+                  <button onClick={() => setPrefillBanner(null)} className="ml-auto opacity-60 hover:opacity-100 transition-opacity">
+                    <XCircle size={16} />
+                  </button>
+                </div>
+              )}
+
+              {error && (
+                <div className="mb-6 flex items-start gap-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/50 text-red-700 dark:text-red-400 px-4 py-3 rounded-xl text-sm">
+                  <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
+                  <span className="font-medium">{error}</span>
+                </div>
+              )}
+
+              {success && (
+                <div className="mb-6 flex items-start gap-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/50 text-emerald-700 dark:text-emerald-400 px-4 py-3 rounded-xl text-sm">
+                  <CheckCircle2 size={16} className="mt-0.5 flex-shrink-0" />
+                  <span className="font-medium">Complaint filed! ID: {complaintId}. Redirecting...</span>
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div>
+                  <label htmlFor="title" className={labelClass}>
+                    {L.title} <span className="text-red-400 ml-0.5">*</span>
+                  </label>
+                  <input type="text" id="title" value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    required className={`${inputBase} ${fieldHighlight("title")}`}
+                    placeholder={L.placeholder_title} />
+                </div>
+
+                <div>
+                  <label htmlFor="description" className={labelClass}>
+                    {L.description} <span className="text-red-400 ml-0.5">*</span>
+                  </label>
+                  <textarea id="description" value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    required rows={3} className={`${inputBase} ${fieldHighlight("description")} resize-y`}
+                    placeholder={L.placeholder_desc} />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Category Dropdown (Custom styled) */}
+                  <div>
+                    <label htmlFor="category" className={labelClass}>
+                      {L.category} <span className="text-red-400 ml-0.5">*</span>
+                    </label>
+                    <div className="relative">
+                      <select id="category" value={formData.category}
+                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                        required className={`${inputBase} appearance-none pr-10 ${fieldHighlight("category")} cursor-pointer`}>
+                        <option value="">Select Category</option>
+                        <option value="Waterlogging">Waterlogging</option>
+                        <option value="Drainage Issue">Drainage Issue</option>
+                        <option value="Road Damage">Road Damage</option>
+                        <option value="Garbage Accumulation">Garbage Accumulation</option>
+                        <option value="Other">Other</option>
+                      </select>
+                      <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="ward_number" className={labelClass}>
+                      {L.ward_number} <span className="text-red-400 ml-0.5">*</span>
+                    </label>
+                    <input type="number" id="ward_number"
+                      value={formData.ward_number > 0 ? formData.ward_number : ""}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 0;
+                        setFormData({ ...formData, ward_number: val });
+                        if (val >= 1 && val <= 272) setFilledByChat((p) => new Set([...p, "ward_number"]));
+                      }}
+                      required min="1" max="272" placeholder="e.g. 44"
+                      className={`${inputBase} ${fieldHighlight("ward_number")}`} />
+                  </div>
+                </div>
+
+                {/* Priority Dropdown (Custom styled) */}
+                <div>
+                  <label htmlFor="priority" className={labelClass}>
+                    {L.priority} <span className="text-red-400 ml-0.5">*</span>
+                  </label>
+                  <div className="relative">
+                    <select id="priority" value={formData.priority}
+                      onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                      className={`${inputBase} appearance-none pr-10 ${fieldHighlight("priority")} cursor-pointer`}>
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="urgent">Urgent</option>
+                    </select>
+                    <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={labelClass}>{L.location}</label>
+                  <button type="button" onClick={getCurrentLocation} disabled={locationLoading}
+                    className="w-full sm:w-auto px-5 py-2.5 bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-sm font-semibold disabled:opacity-60 flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-700">
+                    {locationLoading ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <MapPin size={16} />
+                    )}
+                    {formData.location ? L.location_captured : locationLoading ? "Detecting..." : L.use_location}
+                  </button>
+                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                    
+                  </p>
+                </div>
+
+                <div>
+                  <label className={labelClass}>
+                    {L.photos} <span className="text-red-400 ml-0.5">*</span>
+                  </label>
+
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
+                      selectedFiles.length > 0
+                        ? "border-cyan-400/50 bg-cyan-50/50 dark:bg-cyan-900/10"
+                        : photoError
+                        ? "border-red-300 dark:border-red-800 bg-red-50/50 dark:bg-red-900/10"
+                        : "border-slate-300 dark:border-slate-700 hover:border-cyan-400/50 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                    }`}
+                  >
+                    <ImagePlus size={28} className={`mx-auto mb-3 ${selectedFiles.length > 0 ? "text-cyan-500" : photoError ? "text-red-400" : "text-slate-400"}`} />
+                    <p className={`text-sm font-semibold ${selectedFiles.length > 0 ? "text-cyan-700 dark:text-cyan-400" : photoError ? "text-red-600 dark:text-red-400" : "text-slate-600 dark:text-slate-300"}`}>
+                      {selectedFiles.length > 0
+                        ? `${selectedFiles.length} photo(s) selected`
+                        : photoError
+                        ? "Required: Click to upload evidence"
+                        : "Click to upload visual evidence"}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1.5">Max {MAX_FILES} files, up to {MAX_FILE_SIZE_MB}MB each</p>
+                    <input ref={fileInputRef} type="file" id="attachments" accept="image/*" multiple
+                      onChange={handleFileChange} className="hidden" />
+                  </div>
+
+                  {imagePreviews.length > 0 && (
+                    <div className="mt-4 grid grid-cols-4 sm:grid-cols-5 gap-3">
+                      {imagePreviews.map((preview, index) => (
+                        <div key={index} className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800">
+                          <img src={preview} alt={`Preview ${index}`} className="w-full h-full object-cover" />
+                          <button type="button" onClick={() => handleRemoveImage(index)}
+                            className="absolute top-1 right-1 bg-slate-900/70 text-white rounded-full p-1 hover:bg-red-500 transition-colors backdrop-blur-sm">
+                            <XCircle size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                  <button type="button" onClick={() => router.back()}
+                    className="w-full sm:w-1/3 px-6 py-3.5 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-semibold text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                    {L.cancel}
+                  </button>
+                  <button type="submit" disabled={loading}
+                    className={`w-full sm:w-2/3 px-6 py-3.5 rounded-xl font-semibold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
+                      missingFields.length === 0
+                        ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-md hover:scale-[1.01]"
+                        : "bg-cyan-600 hover:bg-cyan-700 text-white"
+                    }`}>
+                    {loading && <Loader2 size={16} className="animate-spin" />}
+                    {loading ? L.filing : L.submit}
+                  </button>
+                </div>
+
+              </form>
+            </div>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );

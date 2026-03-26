@@ -149,3 +149,39 @@ export interface Complaint {
   created_at: string;
   updated_at: string;
 }
+
+// types/complaint.ts
+// Extends your existing complaint.ts in the repo
+
+export interface ComplaintFormData {
+  name: string;
+  contact: string;
+  location: LocationData | null;
+  ward: string;
+  waterDepth: string;
+  priority: ComplaintPriority;
+  photoFile: File | null;
+  notes: string;
+}
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+  timestamp: Date;
+}
+
+export interface ExtractedFields {
+  name: string | null;
+  contact: string | null;
+  location: string | null;
+  ward: string | null;
+  water_depth: string | null;
+  priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | null;
+  notes: string | null;
+  fields_filled: string[];
+}
+
+export interface AssistantResponse {
+  reply: string;
+  extracted: ExtractedFields;
+}
