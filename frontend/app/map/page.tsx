@@ -110,7 +110,7 @@ export default function MapPage() {
   const [showTraffic, setShowTraffic]                 = useState(false);
   const [showWards, setShowWards]                     = useState(false);
   const [showCrowdsource, setShowCrowdsource]         = useState(false);
-  const [mapMode, setMapMode]                         = useState<MapMode>('leaflet');
+  const [mapMode, setMapMode]                         = useState<MapMode>('google-standard');
   const [villagePreparedness, setVillagePreparedness] = useState<VillagePreparedness | null>(null);
   const [showPreparedness, setShowPreparedness]       = useState(true);
   const [prepFilter, setPrepFilter]                   = useState<string | null>(null);

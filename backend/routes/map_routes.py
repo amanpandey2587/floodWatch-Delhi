@@ -1,13 +1,21 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query,Response
+from fastapi.responses import FileResponse
+import struct
 from pydantic import BaseModel
 from typing import List
 from controllers.map_controller import MapController
 from fastapi import APIRouter, HTTPException,Query
 from shapely.geometry import Point
 from core.state import state
-
+from pathlib import Path
+# from .config import DATA_DIR
 router = APIRouter(tags=["Map & Analysis"])
+# DATA_DIR = state.DATA_DIR
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = BASE_DIR / "east_delhi_data"
 
+print("Data is",DATA_DIR)
+PMTILES_PATH=DATA_DIR/"grid_risk.pmtiles"
 # Models
 class PredictionRequest(BaseModel):
     rainfall_intensity: float
@@ -159,6 +167,30 @@ def get_village_boundaries():
         raise HTTPException(status_code=503, detail="Village data not loaded")
     return state.wards_data
 
+
+@router.get("/api/tiles/{z}/{x}/{y}.mvt")
+async def get_tile(z: int, x: int, y: int):
+    from pmtiles.reader import Reader, MmapSource
+
+    if not PMTILES_PATH.exists():
+        raise HTTPException(status_code=503, detail="Tile file not found")
+
+    with open(PMTILES_PATH, "rb") as f:
+        reader = Reader(MmapSource(f))        # ← pass f, NOT f.read()
+        tile_data = reader.get(z, x, y)
+
+    if tile_data is None:
+        return Response(status_code=204)
+
+    return Response(
+        content=tile_data,
+        media_type="application/vnd.mapbox-vector-tile",
+        headers={
+            "Content-Encoding": "gzip",
+            "Cache-Control": "public, max-age=3600",
+            "Access-Control-Allow-Origin": "*",
+        }
+    )
 
 @router.get("/api/village-preparedness")
 def get_village_preparedness(level: str = None):

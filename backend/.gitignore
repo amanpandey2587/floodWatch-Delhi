@@ -6,6 +6,7 @@ __pycache__/
 flood_model.pkl
 env/
 venv/
+venv2/
 ENV/
 cache/
 .venv
@@ -14,6 +15,10 @@ east_delhi_data/
 east_delhi_data
 data/
 data
-
+tippecanoe/
 .env
 env
+.tar.gz
+\go-pmtiles_1.22.3_Linux_x86_64.tar.gz
+\LICENSE
+\pmtiles
