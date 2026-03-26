@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Query
 from fastapi import HTTPException
-from safe_parking_recommendation import find_best_parking
+from utils.safe_parking_recommendation import find_best_parking
 from typing import Optional, List
-from safe_parking_data import SAFE_PARKING_LOCATIONS
+from utils.safe_parking_data import SAFE_PARKING_LOCATIONS
 import math
 
 

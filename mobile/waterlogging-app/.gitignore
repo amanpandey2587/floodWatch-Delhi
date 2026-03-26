@@ -17,6 +17,10 @@
 # misc
 .DS_Store
 *.pem
+east_delhi_data/
+east_delhi_data
+data/
+data
 
 # debug
 npm-debug.log*

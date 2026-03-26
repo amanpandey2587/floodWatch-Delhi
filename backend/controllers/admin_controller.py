@@ -1,7 +1,7 @@
 from fastapi import HTTPException
 from models import UserModel
-from admin import get_admin_dashboard_stats, get_recent_complaints
-from notifications import create_ward_broadcast
+from utils.admin import get_admin_dashboard_stats, get_recent_complaints
+from utils.notifications import create_ward_broadcast
 
 class AdminController:
     @staticmethod

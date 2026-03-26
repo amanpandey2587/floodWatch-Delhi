@@ -136,7 +136,6 @@ def broadcast_sos(ward_number: int, message: str, broadcast_by: str, sender_name
         "ward": f"Ward {ward_number}",
         "sms_sent": sms_sent,
         "whatsapp_sent": wa_sent,
-        
         "whatsapp_groups_notified": wa_sent,
         "residents_notified": max(sms_sent, wa_sent),
         "skipped_no_phone": skipped,

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import JSONResponse
 from typing import Optional
-from complaints import ComplaintCreate, ComplaintUpdate, ComplaintRating, ComplaintEta
+from utils.complaints import ComplaintCreate, ComplaintUpdate, ComplaintRating, ComplaintEta
 from controllers.complaint_controller import ComplaintController
 
 router = APIRouter(prefix="/api/complaints", tags=["Complaints"])

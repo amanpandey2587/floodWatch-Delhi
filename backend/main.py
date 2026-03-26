@@ -18,7 +18,8 @@ from routes import (
     social_routes
 )
 # load_dotenv()
-PORT = os.getenv("PORT", "8000")
+# PORT = os.getenv("PORT", "8000")
+PORT=8000
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

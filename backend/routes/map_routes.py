@@ -2,6 +2,9 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from typing import List
 from controllers.map_controller import MapController
+from fastapi import APIRouter, HTTPException,Query
+from shapely.geometry import Point
+from core.state import state
 
 router = APIRouter(tags=["Map & Analysis"])
 
@@ -90,9 +93,17 @@ async def get_route(
 def get_grid_data(
     limit: int = Query(None, description="Limit number of cells"),
     risk_min: float = Query(0.0, description="Minimum risk score"),
-    risk_max: float = Query(1.0, description="Maximum risk score")
+    risk_max: float = Query(1.0, description="Maximum risk score"),
+    bbox_n: float = Query(None, description="Viewport north bound"),   # ← ADD
+    bbox_s: float = Query(None, description="Viewport south bound"),   # ← ADD
+    bbox_e: float = Query(None, description="Viewport east bound"),    # ← ADD
+    bbox_w: float = Query(None, description="Viewport west bound"),
+    zoom: int = Query(12)    # ← ADD
 ):
-    return MapController.get_grid_data(limit, risk_min, risk_max)
+    return MapController.get_grid_data(
+        limit, risk_min, risk_max,
+        bbox_n, bbox_s, bbox_e, bbox_w ,zoom   # ← ADD these four args
+    )
 
 @router.get("/api/drains")
 def get_drains_data():
@@ -123,3 +134,203 @@ def get_alternative_routes(
     profile: str = "driving"
 ):
     return MapController.get_alternative_routes(start_lat, start_lon, end_lat, end_lon, profile)
+
+
+@router.get("/api/clusters")
+def get_clusters(severity: str = None):
+    return MapController.get_clusters(severity=severity)
+
+@router.get("/api/isolated-hotspots")
+def get_isolated_hotspots(risk_min: float = 0.5):
+    return MapController.get_isolated_hotspots(risk_min=risk_min)
+
+@router.post("/api/update-rainfall")
+def update_rainfall(payload: dict):
+    return MapController.update_rainfall(
+        rainfall_mm=payload.get("rainfall_mm", 0),
+        coverage_geojson=payload.get("coverage_geojson")
+    )
+
+
+@router.get("/api/village-boundaries")
+def get_village_boundaries():
+    """Returns village polygons as GeoJSON — loaded from KML at startup."""
+    if state.wards_data is None:
+        raise HTTPException(status_code=503, detail="Village data not loaded")
+    return state.wards_data
+
+
+@router.get("/api/village-preparedness")
+def get_village_preparedness(level: str = None):
+    """
+    Returns village polygons with preparedness scores.
+    Optional ?level=Critical+gap to filter by level.
+    """
+    if state.wards_data is None:
+        raise HTTPException(status_code=503, detail="Village data not loaded")
+
+    features = state.wards_data["features"]
+    if level:
+        features = [
+            f for f in features
+            if f["properties"].get("PREP_LEVEL", "") == level
+        ]
+
+    return {
+        "type": "FeatureCollection",
+        "features": features,
+        "metadata": {"total": len(features), "level_filter": level}
+    }
+
+# frontend_map_routes.py
+
+
+@router.get("/api/my-area")
+def get_my_area_risk(
+    lat: float = Query(...),
+    lon: float = Query(...),
+):
+    if state.grid_gdf is None:
+        raise HTTPException(status_code=503, detail="Grid not loaded")
+    if state.db_engine is None:
+        raise HTTPException(status_code=503, detail="DB not connected")
+
+    # ── 1. Find nearest grid cell ──────────────────────────────────────────
+    grid = state.grid_gdf.copy()
+    grid["dist"] = (grid.geometry.centroid.x - lon)**2 + (grid.geometry.centroid.y - lat)**2
+    nearest = grid.loc[grid["dist"].idxmin()]
+
+    risk_score    = float(nearest.get("risk_score", 0))
+    risk_category = str(nearest.get("risk_category", "Unknown"))
+    ward_name     = str(nearest.get("ward_name", ""))
+    elevation     = float(nearest.get("elevation_m", 0))
+    drain_dist    = float(nearest.get("drain_distance_m", 0))
+
+    if risk_score >= 0.7:
+        level, color, advice = "High",   "#e24b4a", "Avoid low-lying areas. Move valuables to higher floors."
+    elif risk_score >= 0.4:
+        level, color, advice = "Medium", "#f97316", "Stay alert. Monitor local updates."
+    else:
+        level, color, advice = "Low",    "#22c55e", "No immediate flood risk in your area."
+
+    # ── 2. Find village by GPS coordinate using PostGIS ST_Contains ────────
+    # This is the correct approach — works even when grid cell has no village
+    village      = ""
+    prep_score   = None
+    prep_level   = None
+    prep_color   = None
+    prep_actions = None
+    desilting    = None
+
+    try:
+        from sqlalchemy import text
+        with state.db_engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT
+                    village,
+                    tehsil,
+                    district,
+                    preparedness_score,
+                    preparedness_level,
+                    preparedness_color,
+                    desilting_pct,
+                    action_items
+                FROM villages
+                WHERE ST_Contains(
+                    geometry,
+                    ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)
+                )
+                AND village IS NOT NULL
+                LIMIT 1
+            """), {"lat": lat, "lon": lon})
+
+            row = result.fetchone()
+
+            if row:
+                village      = row.village      or ""
+                prep_score   = row.preparedness_score
+                prep_level   = row.preparedness_level
+                prep_color   = row.preparedness_color
+                prep_actions = row.action_items
+                desilting    = row.desilting_pct
+            else:
+                # Point is outside all village polygons
+                # Fall back to nearest village centroid
+                result2 = conn.execute(text("""
+                    SELECT
+                        village, tehsil, district,
+                        preparedness_score, preparedness_level,
+                        preparedness_color, desilting_pct, action_items,
+                        ST_Distance(
+                            geometry::geography,
+                            ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography
+                        ) AS dist_m
+                    FROM villages
+                    WHERE village IS NOT NULL
+                    ORDER BY geometry::geography <-> ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography
+                    LIMIT 1
+                """), {"lat": lat, "lon": lon})
+
+                row2 = result2.fetchone()
+                if row2:
+                    village      = f"{row2.village} (nearest)"
+                    prep_score   = row2.preparedness_score
+                    prep_level   = row2.preparedness_level
+                    prep_color   = row2.preparedness_color
+                    prep_actions = row2.action_items
+                    desilting    = row2.desilting_pct
+
+    except Exception as e:
+        print(f"Village DB lookup failed: {e}")
+        # Non-fatal — continue without village data
+
+    # ── 3. Nearby high-risk hotspots within 2km ────────────────────────────
+    grid["dist_m"] = (
+        ((grid.geometry.centroid.x - lon)**2 +
+         (grid.geometry.centroid.y - lat)**2) ** 0.5
+    ) * 111_000
+
+    nearby = (
+        grid[(grid["risk_score"] >= 0.5) & (grid["dist_m"] <= 2000)]
+        .sort_values("dist_m")
+        .head(3)
+    )
+
+    hotspots = [
+        {
+            "lat":        float(r.geometry.centroid.y),
+            "lon":        float(r.geometry.centroid.x),
+            "risk_score": round(float(r["risk_score"]), 3),
+            "distance_m": round(float(r["dist_m"]), 0),
+            "village":    str(r.get("village", "") or ""),
+        }
+        for _, r in nearby.iterrows()
+    ]
+
+    return {
+        "location": {
+            "lat":     lat,
+            "lon":     lon,
+            "village": village,
+            "ward":    ward_name,
+        },
+        "risk": {
+            "score":    round(risk_score, 3),
+            "category": risk_category,
+            "level":    level,
+            "color":    color,
+            "advice":   advice,
+        },
+        "terrain": {
+            "elevation_m":      round(elevation, 1),
+            "drain_distance_m": round(drain_dist, 0),
+        },
+        "nearby_hotspots": hotspots,
+        "preparedness": {
+            "score":      prep_score,
+            "level":      prep_level,
+            "color":      prep_color,
+            "actions":    prep_actions,
+            "desilting":  desilting,
+        }
+    }
