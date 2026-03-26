@@ -1,0 +1,24 @@
+# Secrets
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+
+# Explicit sensitive file
+backend/firebase-service-account.json
+
+# Large files
+*.pdf
+*.pkl
+*.tar.gz
+
+# Datasets
+data/
+east_delhi_data/
+
+# Env
+.env
+.env.*
+
+# OS
+.DS_Store

@@ -22,6 +22,10 @@ def find_best_parking(user_lat: float, user_lon: float, radius: int = 3000, limi
     G = state.road_graph
     parking_gdf = state.safe_parking_gdf
 
+    print("Graph:", G is not None)
+    print("Parking GDF:", parking_gdf is not None)
+    print("Parking empty:", parking_gdf.empty if parking_gdf is not None else None)
+
     if G is None or parking_gdf is None or parking_gdf.empty:
         raise Exception("Safe parking resources not loaded")
 

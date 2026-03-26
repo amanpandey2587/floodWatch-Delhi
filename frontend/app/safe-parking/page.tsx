@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { API_BASE_URL, useSafeParkingAPI } from '@/lib/api';
 import { Navigation, Loader, AlertTriangle, MapPin, Clock, Route } from 'lucide-react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Polyline, Polygon } from '@react-google-maps/api';
+import { GOOGLE_MAPS_CONFIG } from '@/lib/googleMap';
 
 interface ParkingLocation {
   name: string;
@@ -125,13 +126,15 @@ export default function SafeParkingPage() {
   const [selectedOrigin, setSelectedOrigin] = useState(false);
   const [selectedParking, setSelectedParking] = useState<number | null>(null);
 
-  const { isLoaded, loadError } = useJsApiLoader({
-    id: 'google-map-script', // MUST be same everywhere
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
-    libraries: ['places', 'visualization'], // include ALL needed libs
-    language: 'en',
-    region: 'US',
-  })
+  // const { isLoaded, loadError } = useJsApiLoader({
+  //   id: 'google-map-script', // MUST be same everywhere
+  //   googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
+  //   libraries: ['places', 'visualization'], // include ALL needed libs
+  //   language: 'en',
+  //   region: 'US',
+  // })
+
+  const { isLoaded, loadError } = useJsApiLoader(GOOGLE_MAPS_CONFIG);
 
   const parseNumber = (value: string) => {
     const num = Number(value);
