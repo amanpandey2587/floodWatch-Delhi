@@ -1,5 +1,7 @@
 from fastapi import FastAPI, Request
 import os
+from download_data import download_all
+from dotenv import load_dotenv
 from fastapi import APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
@@ -17,12 +19,14 @@ from routes import (
     safe_parking_routes,
     social_routes
 )
-# load_dotenv()
-# PORT = os.getenv("PORT", "8000")
-PORT=8000
+load_dotenv()
+PORT = int(os.getenv("PORT", 8000))
+# PORT=8000
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    print("___Downloading data from azure blob")
+    download_all()
     print("Starting up...")
     state.load_data()
     yield
@@ -44,15 +48,13 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={"detail": exc.errors()},
     )
 
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "*"], # Added * for mobile dev flexibility
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,  # ← change to False
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 
 # Include Routers

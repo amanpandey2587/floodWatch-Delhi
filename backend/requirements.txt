@@ -22,3 +22,8 @@ pydantic[email]
 polyline
 orjson
 redis
+azure-storage-blob
+sqlalchemy
+beautifulsoup4
+psycopg2-binary
+pmtiles
